@@ -92,7 +92,45 @@ export default function Home() {
 
         if (intent.type === 'LOGIN') {
           if (intent.params.email && intent.params.password) {
-            addAssistantMessage(`Attempting to find companies for email: ${intent.params.email}...`);
+            const explicitTenantId = intent.params.tenantId;
+
+            if (explicitTenantId) {
+              addAssistantMessage(`Using provided tenant: ${explicitTenantId}. Authenticating...`);
+              localStorage.setItem('tenantId', explicitTenantId);
+
+              const authData = await authService.login({
+                userNameOrEmailAddress: intent.params.email,
+                password: intent.params.password,
+                rememberClient: true
+              });
+
+              if (authData.result?.accessToken) {
+                localStorage.setItem('token', authData.result.accessToken);
+                setSession(prev => ({
+                  ...prev,
+                  token: authData.result.accessToken,
+                  step: 'AUTHENTICATED',
+                  data: { ...prev.data, email: intent.params.email, tenantId: explicitTenantId }
+                }));
+                addAssistantMessage(`Successfully authenticated with tenant ${explicitTenantId}! I'm ready to help.`);
+
+                // Handle multi-intent (e.g. login AND get report)
+                if (currentInput.toLowerCase().includes('balance sheet')) {
+                  addAssistantMessage('Fetching your Balance Sheet...');
+                  const today = new Date().toISOString();
+                  const report = await reportingService.getBalanceSheet(today);
+                  if (report.result) {
+                    addAssistantMessage(`Balance Sheet ready: ${report.pdfLink || 'Process complete.'}`);
+                  }
+                }
+                return;
+              } else {
+                addAssistantMessage(`Login failed for tenant ${explicitTenantId}. Please check your password.`);
+                return;
+              }
+            }
+
+            addAssistantMessage(`Searching for companies linked to ${intent.params.email}...`);
             const tenants = await authService.getTenants(intent.params.email);
 
             if (tenants.result && Array.isArray(tenants.result) && tenants.result.length > 0) {
@@ -105,21 +143,20 @@ export default function Home() {
 
               if (authData.result?.accessToken) {
                 localStorage.setItem('token', authData.result.accessToken);
-                const tenantList = tenants.result.map((t: any, i: number) => `${i + 1}. ${t.tenancyName}`).join('\n');
+                const tenantList = tenants.result.map((t: any, i: number) => `${i + 1}. ${t.tenancyName} (ID: ${t.tenantId})`).join('\n');
                 setSession(prev => ({
                   ...prev,
                   token: authData.result.accessToken,
                   step: 'TENANT_SELECTION',
                   data: { ...prev.data, email: intent.params.email, tenants: tenants.result }
                 }));
-                addAssistantMessage(`Authentication successful! Please select a company from the list (type the name or number):\n\n${tenantList}`);
+                addAssistantMessage(`Authentication successful! Please select a company from the list (type name or number):\n\n${tenantList}`);
               } else {
-                addAssistantMessage(`Account found, but password was incorrect for ${intent.params.email}. Please try again.`);
+                addAssistantMessage(`Found your account, but the password was incorrect for ${intent.params.email}.`);
                 setSession(prev => ({ ...prev, step: 'AUTH_PASSWORD', data: { ...prev.data, email: intent.params.email, tenants: tenants.result } }));
               }
             } else {
-              addAssistantMessage(`I could not find any companies associated with "${intent.params.email}". Double check the email address or register your tenant.`);
-              console.log('Discovery failed for:', intent.params.email, tenants);
+              addAssistantMessage(`I could not find any companies for "${intent.params.email}". If you have a Tenant ID, please provide it (e.g., "login with ... tenant [ID]")`);
             }
           } else {
             setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));

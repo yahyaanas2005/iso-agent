@@ -18,8 +18,7 @@ export const reportingService = {
             method: 'POST',
             body: JSON.stringify({ fromdate: fromDate, todate: toDate }),
         });
-    }
-
+    },
     getBankInfo: async () => {
         return api('/api/services/app/Bank/GetBankInfoList', {
             method: 'GET',
