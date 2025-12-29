@@ -223,9 +223,11 @@ export default function Home() {
 
                 const today = new Date().toISOString();
                 const pdfReport = await reportingService.getBalanceSheet(today);
-                const pdfUrl = pdfReport.pdfLink?.startsWith('http')
-                  ? pdfReport.pdfLink
-                  : `https://api.isolaterp.ai${pdfReport.pdfLink?.startsWith('/') ? '' : '/'}${pdfReport.pdfLink}`;
+                const pdfUrl = pdfReport?.pdfLink
+                  ? (pdfReport.pdfLink.startsWith('http')
+                    ? pdfReport.pdfLink
+                    : `https://api.isolaterp.ai${pdfReport.pdfLink.startsWith('/') ? '' : '/'}${pdfReport.pdfLink}`)
+                  : '#';
 
                 addAssistantMessage('Your Balance Sheet is ready!', 'report', {
                   title: 'Balance Sheet',
@@ -281,10 +283,12 @@ export default function Home() {
               const realData = await fetchRealReportData();
 
               const today = new Date().toISOString();
-              const pdfReport = await reportingService.getBalanceSheet(today);
-              const pdfUrl = pdfReport.pdfLink?.startsWith('http')
-                ? pdfReport.pdfLink
-                : `https://api.isolaterp.ai${pdfReport.pdfLink?.startsWith('/') ? '' : '/'}${pdfReport.pdfLink}`;
+              const pdfRes = await reportingService.getBalanceSheet(today);
+              const pdfUrl = pdfRes?.pdfLink
+                ? (pdfRes.pdfLink.startsWith('http')
+                  ? pdfRes.pdfLink
+                  : `https://api.isolaterp.ai${pdfRes.pdfLink.startsWith('/') ? '' : '/'}${pdfRes.pdfLink}`)
+                : '#';
 
               addAssistantMessage('Generated your Balance Sheet using real-time ERP data.', 'report', {
                 title: 'Balance Sheet',
@@ -315,6 +319,15 @@ export default function Home() {
             } else if (!result.success) {
               addAssistantMessage(`Failed to record purchase: ${result.error || 'Unknown error'}`);
             }
+          }
+        } else if (intent.type === 'SEARCH_CUSTOMER') {
+          addAssistantMessage(`Searching for customer: "${intent.params.query}"...`);
+          const res = await reportingService.getCustomers(intent.params.query);
+          if (res.result && res.result.length > 0) {
+            const list = res.result.map((c: any) => `• ${c.customerTitle} (ID: ${c.id})`).join('\n');
+            addAssistantMessage(`I found ${res.result.length} matching customers:\n\n${list}`);
+          } else {
+            addAssistantMessage(`No customers found matching "${intent.params.query}".`);
           }
         } else if (intent.type === 'LIST_CUSTOMERS') {
           addAssistantMessage('Retrieving customer list...');

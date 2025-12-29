@@ -1,4 +1,4 @@
-export type IntentType = 'LOGIN' | 'RECORD_SALE' | 'RECORD_PURCHASE' | 'GET_REPORT' | 'GET_LEDGER' | 'LIST_CUSTOMERS' | 'LIST_ITEMS' | 'LIST_VENDORS' | 'SWITCH_TENANT' | 'HELP' | 'UNKNOWN';
+export type IntentType = 'LOGIN' | 'RECORD_SALE' | 'RECORD_PURCHASE' | 'GET_REPORT' | 'GET_LEDGER' | 'LIST_CUSTOMERS' | 'LIST_ITEMS' | 'LIST_VENDORS' | 'SEARCH_CUSTOMER' | 'SWITCH_TENANT' | 'HELP' | 'UNKNOWN';
 
 export interface Intent {
     type: IntentType;
@@ -27,15 +27,20 @@ export const mapIntent = (input: string): Intent => {
         return { type: 'GET_LEDGER', params: { account: text.replace(/ledger|account history|statement for/gi, '').trim() } };
     }
 
-    if (text.includes('customer list') || text.includes('show customers')) {
+    if (text.includes('customer') && (text.includes('search') || text.includes('find') || text.includes('look up'))) {
+        const query = text.replace(/search|customer|find|look up|for/gi, '').trim();
+        return { type: 'SEARCH_CUSTOMER', params: { query } };
+    }
+
+    if (text.includes('customer') || text.includes('client')) {
         return { type: 'LIST_CUSTOMERS', params: {} };
     }
 
-    if (text.includes('item list') || text.includes('inventory') || text.includes('show items')) {
+    if (text.includes('item') || text.includes('inventory') || text.includes('stock')) {
         return { type: 'LIST_ITEMS', params: {} };
     }
 
-    if (text.includes('vendor list') || text.includes('suppliers')) {
+    if (text.includes('vendor') || text.includes('supplier')) {
         return { type: 'LIST_VENDORS', params: {} };
     }
 
