@@ -210,8 +210,11 @@ export default function Home() {
               }
               return;
             } else {
+              const pwHint = intent.params.password
+                ? `${intent.params.password[0]}***${intent.params.password.slice(-1)}`
+                : 'none';
               const diagError = authData.error || 'Invalid credentials.';
-              addAssistantMessage(`Authentication failed for ${explicitTenantId || 'Default Tenant'}. Error: ${diagError}`);
+              addAssistantMessage(`Authentication failed for ${explicitTenantId || 'Default Tenant'}. (Extracted Email: ${intent.params.email}, PW: ${pwHint}). Error: ${diagError}`);
               return;
             }
           } else {

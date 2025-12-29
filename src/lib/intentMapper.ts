@@ -14,7 +14,8 @@ export const mapIntent = (input: string): Intent => {
 
         // Look for password after keywords in the ORIGINAL input
         // Keywords are case-insensitive, but capture is as-is
-        const pwMatch = input.match(/(?:password|with|and|is)\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/i);
+        // Removing 'with' to avoid matching 'with email'
+        const pwMatch = input.match(/(?:password|is|and)\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/i);
         const password = pwMatch ? pwMatch[1] : null;
 
         // Extract Tenant ID from ORIGINAL input (e.g. "tenant O1EG681Y4V")
