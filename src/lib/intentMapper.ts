@@ -8,17 +8,28 @@ export interface Intent {
 export const mapIntent = (input: string): Intent => {
     const text = input.toLowerCase();
 
-    if (text.includes('login') || text.includes('sign in')) {
+    if (text.includes('login') || text.includes('sign in') || text.includes('authenticate')) {
         const email = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
-        // Look for password after keywords like "password", "with", "and" or just a standalone string at the end
-        const pwMatch = text.match(/(?:password|with|and)\s+([a-zA-Z0-9!@#$%^&*()_+]+)/);
+        // Look for password after keywords like "password", "with", "and" or "is"
+        const pwMatch = text.match(/(?:password|with|and|is)\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/);
         const password = pwMatch ? pwMatch[1] : null;
 
         return { type: 'LOGIN', params: { email, password } };
     }
 
+    // Prioritize Reports/Ledgers over recording actions
+    if (text.includes('report') || text.includes('ledger') || text.includes('statement') ||
+        text.includes('balance sheet') || text.includes('profit and loss') || text.includes('p&l')) {
+        return {
+            type: 'GET_REPORT', params: {
+                isBalanceSheet: text.includes('balance'),
+                isProfitLoss: text.includes('profit') || text.includes('p&l'),
+                ledgerTitle: text.includes('ledger') ? 'Sales Ledger' : null
+            }
+        };
+    }
+
     if (text.includes('sale') || text.includes('invoice') || text.includes('sold')) {
-        // Basic extraction logic
         const amount = text.match(/\d+(\.\d+)?/)?.[0];
         return { type: 'RECORD_SALE', params: { amount } };
     }
@@ -28,11 +39,7 @@ export const mapIntent = (input: string): Intent => {
         return { type: 'RECORD_PURCHASE', params: { amount } };
     }
 
-    if (text.includes('report') || text.includes('how is the company doing')) {
-        return { type: 'GET_REPORT', params: {} };
-    }
-
-    if (text.includes('switch') || text.includes('change company')) {
+    if (text.includes('switch') || text.includes('change company') || text.includes('company list') || text.includes('show company')) {
         return { type: 'SWITCH_TENANT', params: {} };
     }
 
