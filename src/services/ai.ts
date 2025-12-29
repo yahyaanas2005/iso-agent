@@ -17,9 +17,36 @@ export const aiService = {
          - Body: { "customerTitle": "Name", "address": "...", "phone": "...", "email": "..." }
          
       2. **Create Inventory Item**:
-         - Endpoint: /api/services/app/Item/CreateInventoryItem
+          - Endpoint: /api/services/app/Item/CreateInventoryItem
          - Method: POST
          - Body: { "itemTitle": "Name", "purchaseRate": 0, "saleRate": 0, "uomTitle": "PCS" }
+
+      3. **List Customers**:
+         - Endpoint: /api/services/app/Customer/GetCustomersTitleResponse
+         - Method: GET
+         - Description: Returns list of customers. If user asks for "list", return JSON action to call this.
+
+      4. **List Inventory Items**:
+         - Endpoint: /api/services/app/Item/GetItemsTitleResponse
+         - Method: GET
+
+      5. **List Banks/Accounts**:
+         - Endpoint: /api/services/app/BankAccount/GetBankAccounts
+         - Method: GET
+
+      6. **Account Ledger Report**:
+         - Endpoint: /api/Reports/AccountLedger
+         - Method: POST
+         - Body: { "fromDate": "YYYY-MM-DD", "toDate": "YYYY-MM-DD", "accountId": 0 }
+
+      7. **List Companies/Tenants**:
+         - Endpoint: /api/services/app/Account/GetLoginTenants
+         - Method: POST
+         - Body: { "email": "..." } (Only works if not logged in? Or for switching).
+         
+      ## HANDLING LISTS & HTML
+      - If the user asks for a LIST (e.g., "show customers"), ALWAYS use the \`EXECUTE_API\` action.
+      - If the user specifically asks for "HTML format", simply execute the API. The frontend will handle the display.
 
       ## OUTPUT FORMAT
       If the user wants to PERFORM an action, do NOT just say you will do it. Output ONLY a valid JSON block like this:

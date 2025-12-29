@@ -16,7 +16,7 @@ export default function Home() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_OPENAI_API_KEY || '');
   const [showSettings, setShowSettings] = useState(false);
   const [session, setSession] = useState<{
     token: string | null;
@@ -29,6 +29,8 @@ export default function Home() {
     step: 'GREETING',
     data: {}
   });
+
+  const [currentInput, setCurrentInput] = useState('');
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +54,7 @@ export default function Home() {
 
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        setInput(transcript);
+        setCurrentInput(transcript);
         setIsListening(false);
       };
 
@@ -624,29 +626,29 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                 </div>
                 <div className="modal-body">
                   {showReportModal.data ? (
-                  <table className="report-table">
-                    <thead>
-                      <tr>
-                        <th>Category / Account</th>
-                        <th className="amount-col">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {showReportModal.data.map((cat: any, ci: number) => (
-                        <React.Fragment key={ci}>
-                          <tr className="category-row">
-                            <td colSpan={2}>{cat.category}</td>
-                          </tr>
-                          {cat.items.map((item: any, ii: number) => (
-                            <tr key={ii}>
-                              <td>{item.name}</td>
-                              <td className="amount-col">${item.amount}</td>
+                    <table className="report-table">
+                      <thead>
+                        <tr>
+                          <th>Category / Account</th>
+                          <th className="amount-col">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {showReportModal.data.map((cat: any, ci: number) => (
+                          <React.Fragment key={ci}>
+                            <tr className="category-row">
+                              <td colSpan={2}>{cat.category}</td>
                             </tr>
-                          ))}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
+                            {cat.items.map((item: any, ii: number) => (
+                              <tr key={ii}>
+                                <td>{item.name}</td>
+                                <td className="amount-col">${item.amount}</td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
                   ) : <p>No detailed data available for this report type.</p>}
                 </div>
               </div>
