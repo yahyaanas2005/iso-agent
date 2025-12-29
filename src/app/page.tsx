@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import './chat.css';
@@ -194,14 +194,46 @@ export default function Home() {
               localStorage.removeItem('tenantId');
             }
 
-            const authData = await authService.login({
-              userNameOrEmailAddress: intent.params.email,
-              password: intent.params.password,
-              tenancyName: explicitTenantId || undefined,
-              rememberClient: true
-            });
+            let authData;
+            try {
+              authData = await authService.login({
+                userNameOrEmailAddress: intent.params.email,
+                password: intent.params.password,
+                tenancyName: explicitTenantId || undefined,
+                rememberClient: true
+              });
+            } catch (e) {
+              authData = { result: null, error: e };
+            }
 
-            if (authData.result && authData.result.accessToken) {
+            if (!authData?.result?.accessToken) {
+              // Login failed. It might be due to invalid tenant.
+              // Try to fetch tenants by simulating a "Get Tenants" check (requires no auth usually or host auth)
+              // NOTE: GetLoginTenants usually requires a valid email but no auth token if it's the "Isolate" style discovery, 
+              // but here we might need to rely on the service.
+              addAssistantMessage(`Authentication failed for ${explicitTenantId || 'Host'}. Attempting to list available companies...`);
+
+              try {
+                const tenantRes = await authService.getTenants(intent.params.email);
+                const tenants = tenantRes.result || [];
+                if (tenants.length > 0) {
+                  // Only save partial session
+                  setSession(prev => ({
+                    ...prev,
+                    step: 'TENANT_SELECTION',
+                    data: { ...prev.data, email: intent.params.email, tenants }
+                  }));
+                  const list = tenants.map((t: any, i: number) => `**${t.tenancyName}** (PIN: ${t.tenantId})`).join('\n');
+                  addAssistantMessage(`I could not log you into the specific company provided, but I found these companies linked to your email:\n\n${list}\n\nPlease reply with the **Company Name** or **PIN** you want to access.`);
+                  return; // Stop here, wait for user selection
+                }
+              } catch (tenantErr) {
+                console.log('Tenant fetch failed', tenantErr);
+              }
+              addAssistantMessage(`Login failed completely. Please check your email, password, or Company PIN.`);
+              return;
+            } else {
+              // Success block continues below...
               const token = authData.result.accessToken;
               localStorage.setItem('token', token);
 
@@ -242,22 +274,28 @@ export default function Home() {
               const lowerInput = currentInput.toLowerCase();
               if (lowerInput.includes('balance sheet') || lowerInput.includes('report') || lowerInput.includes('pnl') || lowerInput.includes('profit')) {
                 addAssistantMessage('Fetching your financial data for the report...');
-                const realData = await fetchRealReportData();
-
                 let pdfReport;
                 let reportTitle = 'Financial Report';
+                let realData; // Declare realData here
 
                 if (lowerInput.includes('profit') || lowerInput.includes('pnl') || lowerInput.includes('loss')) {
-                  // Default to last 6 months if not specified
-                  const toDate = new Date();
-                  const fromDate = new Date();
-                  fromDate.setMonth(toDate.getMonth() - 6);
-                  pdfReport = await reportingService.getPNL(fromDate.toISOString(), toDate.toISOString());
-                  reportTitle = 'Profit & Loss (Last 6 Months)';
+                  const toDate = new Date().toISOString();
+                  // Default to last 15 days if user mentioned it, strictly parsing "last X days" is complex without full NLP library, 
+                  // but we can default to 15 days as requested or 6 months fallback.
+                  // Simple heuristic:
+                  let fromDate = new Date(new Date().setMonth(new Date().getMonth() - 6)).toISOString();
+                  if (lowerInput.includes('15 days') || lowerInput.includes('15 day')) {
+                    fromDate = new Date(new Date().setDate(new Date().getDate() - 15)).toISOString();
+                  }
+
+                  pdfReport = await reportingService.getPNL(fromDate, toDate);
+                  reportTitle = 'Profit & Loss Statement';
+                  realData = null; // Do NOT show Balance Sheet HTML table for P&L
                 } else {
                   const today = new Date().toISOString();
                   pdfReport = await reportingService.getBalanceSheet(today);
                   reportTitle = 'Balance Sheet';
+                  realData = await fetchRealReportData(); // Only fetch safe BS snapshot data for BS
                 }
 
                 // Check nesting: API returns { result: { pdfLink: "..." } } usually
@@ -382,7 +420,7 @@ export default function Home() {
           const res = await reportingService.getCustomers(intent.params.query);
           const customers = res.result?.result || res.result || [];
           if (customers && customers.length > 0) {
-            const list = customers.map((c: any) => `• ${c.customerTitle} (ID: ${c.id})`).join('\n');
+            const list = customers.map((c: any) => `â€¢ ${c.customerTitle} (ID: ${c.id})`).join('\n');
             addAssistantMessage(`I found ${customers.length} matching customers:\n\n${list}`);
           } else {
             addAssistantMessage(`No customers found matching "${intent.params.query}".`);
@@ -392,7 +430,7 @@ export default function Home() {
           const res = await reportingService.getCustomers();
           const customers = res.result?.result || res.result || [];
           if (Array.isArray(customers) && customers.length > 0) {
-            const list = customers.slice(0, 20).map((c: any) => `• ${c.customerTitle}`).join('\n');
+            const list = customers.slice(0, 20).map((c: any) => `â€¢ ${c.customerTitle}`).join('\n');
             addAssistantMessage(`Found ${customers.length} customers (showing top 20):\n\n${list}`);
           } else {
             addAssistantMessage('Could not retrieve customers or the list is empty.');
@@ -402,7 +440,7 @@ export default function Home() {
           const res = await reportingService.getItems();
           const items = res.result?.result || res.result || [];
           if (Array.isArray(items) && items.length > 0) {
-            const list = items.slice(0, 20).map((i: any) => `• ${i.itemTitle || i.inventoryItemTitle}`).join('\n');
+            const list = items.slice(0, 20).map((i: any) => `â€¢ ${i.itemTitle || i.inventoryItemTitle}`).join('\n');
             addAssistantMessage(`Found ${items.length} items in inventory (showing top 20):\n\n${list}`);
           } else {
             addAssistantMessage('Could not retrieve items or the list is empty.');
@@ -412,7 +450,7 @@ export default function Home() {
           const res = await reportingService.getVendors();
           const vendors = res.result?.result || res.result || [];
           if (Array.isArray(vendors) && vendors.length > 0) {
-            const list = vendors.slice(0, 20).map((v: any) => `• ${v.venderTitle || v.vendorTitle}`).join('\n');
+            const list = vendors.slice(0, 20).map((v: any) => `â€¢ ${v.venderTitle || v.vendorTitle}`).join('\n');
             addAssistantMessage(`Found ${vendors.length} vendors (showing top 20):\n\n${list}`);
           } else {
             addAssistantMessage('Could not retrieve vendors or the list is empty.');
@@ -424,8 +462,8 @@ export default function Home() {
 1. **Authentication**: Mention your email, password, and tenant ID to login (e.g., "login with user@mail.com password 123 tenant XYZ").
 2. **Reports**: Ask for "balance sheet" or "profit and loss" to see live data.
 3. **Voice Control**: 
-   - Click the 🎤 icon to speak.
-   - Click the 🔊/🔈 icon to toggle AI voice output.
+   - Click the ðŸŽ¤ icon to speak.
+   - Click the ðŸ”Š/ðŸ”ˆ icon to toggle AI voice output.
    - **Mic Permissions**: If the mic doesn't work, click the lock icon in your browser address bar and set 'Microphone' to 'Allow'.
 4. **Data Entry**: Mention sales or purchases (e.g., "record a sale of 500").
 5. **Context**: Use "switch company" to change your tenant context.
@@ -507,7 +545,7 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
       <div className="chat-window">
         <header className="header">
           <div className="logo">
-            <span className="logo-icon">▲</span>
+            <span className="logo-icon">â–²</span>
             <h1>ISOLATERP <span>AI Accountant</span></h1>
           </div>
           <div className="actions">
@@ -517,11 +555,11 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                 onClick={() => setSpeechEnabled(!speechEnabled)}
                 title={speechEnabled ? "Mute AI Voice" : "Enable AI Voice"}
               >
-                {speechEnabled ? '🔊' : '🔈'}
+                {speechEnabled ? 'ðŸ”Š' : 'ðŸ”ˆ'}
               </button>
             </div>
             <button className="settings-btn" onClick={() => setShowSettings(!showSettings)}>
-              ⚙️
+              âš™ï¸
             </button>
             <div className="status">
               <span className="status-dot"></span> Online
@@ -552,22 +590,58 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                 {msg.type === 'report' && (
                   <div className="report-card">
                     <div className="report-header">
-                      <span className="report-icon">📊</span>
+                      <span className="report-icon">ðŸ“Š</span>
                       <span className="report-title">{msg.data?.title || 'Financial Report'}</span>
                     </div>
                     <div className="report-meta" style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
-                      Source: Live ERP • Tenant: {session.tenantId || 'Default'}
+                      Source: Live ERP â€¢ Tenant: {session.tenantId || 'Default'}
                     </div>
                     <div className="report-summary">
                       {msg.data?.summary || 'The requested financial statement has been generated successfully.'}
                     </div>
                     <div className="report-actions">
-                      <a href={msg.data?.pdfLink || '#'} target="_blank" className="btn-download" rel="noreferrer">
-                        📥 Download PDF
+                      <a href={msg.data?.pdfLink} target="_blank" rel="noopener noreferrer" className="action-btn pdf">
+                        ðŸ“¥ Download PDF
                       </a>
-                      <button className="btn-view" onClick={() => setShowReportModal(msg.data)}>
-                        👁️ View HTML
-                      </button>
+                      {msg.data?.htmlData && (
+                        <button
+                          className="action-btn view"
+                          onClick={() => setShowReportModal({
+                            title: msg.data.title,
+                            data: msg.data.htmlData
+                          })}
+                        >
+                          ðŸ‘ï¸ View HTML
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {showReportModal && (
+                  <div className="report-modal-overlay" onClick={() => setShowReportModal(null)}>
+                    <div className="report-modal" onClick={e => e.stopPropagation()}>
+                      <div className="modal-header">
+                        <h2>{showReportModal.title}</h2>
+                        <button className="close-btn" onClick={() => setShowReportModal(null)}>Ã—</button>
+                      </div>
+                      <div className="modal-body">
+                        <table className="report-table">
+                          <thead>
+                            <tr>
+                              <th>Category / Account</th>
+                              <th className="amount-col">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                                    <td className="amount-col">${item.amount}</td>
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -580,9 +654,10 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
               <div className="report-modal" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                   <h2>{showReportModal.title}</h2>
-                  <button className="close-btn" onClick={() => setShowReportModal(null)}>×</button>
+                  <button className="close-btn" onClick={() => setShowReportModal(null)}>Ã—</button>
                 </div>
                 <div className="modal-body">
+                  {showReportModal.data ? (
                   <table className="report-table">
                     <thead>
                       <tr>
@@ -591,7 +666,7 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                       </tr>
                     </thead>
                     <tbody>
-                      {showReportModal.htmlData?.map((cat: any, ci: number) => (
+                      {showReportModal.data.map((cat: any, ci: number) => (
                         <React.Fragment key={ci}>
                           <tr className="category-row">
                             <td colSpan={2}>{cat.category}</td>
@@ -602,62 +677,38 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                               <td className="amount-col">${item.amount}</td>
                             </tr>
                           ))}
-                          <tr className="total-row">
-                            <td>Total {cat.category}</td>
-                            <td className="amount-col">${cat.total}</td>
-                          </tr>
                         </React.Fragment>
                       ))}
                     </tbody>
                   </table>
+                  ) : <p>No detailed data available for this report type.</p>}
                 </div>
-                <div className="modal-footer">
-                  <a href={showReportModal.pdfLink} target="_blank" className="btn-download" rel="noreferrer">
-                    Download Full PDF Report
-                  </a>
-                </div>
-              </div>
-            </div>
-          )}
-          {loading && (
-            <div className="message-wrapper assistant">
-              <div className="avatar">IA</div>
-              <div className="message-content typing">
-                <span></span><span></span><span></span>
               </div>
             </div>
           )}
         </div>
 
-        <div className="input-container">
-          {input && historyManager.getSuggestions(input).length > 0 && (
-            <div className="suggestions">
-              {historyManager.getSuggestions(input).map((s, i) => (
-                <button key={i} onClick={() => setInput(s)}>{s}</button>
-              ))}
-            </div>
-          )}
-          <div className="input-area">
-            <button
-              className={`mic-btn ${isListening ? 'active' : ''}`}
-              onClick={toggleListening}
-              title="Speak to the Accountant"
-            >
-              🎤
-            </button>
-            <input
-              type="text"
-              placeholder="Type your command (e.g., 'Get balance sheet')..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            />
-            <button onClick={handleSend} disabled={loading}>
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
-            </button>
-          </div>
+        <div className="input-area">
+          <button
+            className={`mic-btn ${isListening ? 'listening' : ''}`}
+            onClick={toggleListening}
+            title={isListening ? "Stop Listening" : "Start Listening"}
+          >
+            {isListening ? 'ðŸ›‘' : 'ðŸŽ¤'}
+          </button>
+          <input
+            type="text"
+            placeholder="Type your command (e.g., 'Get balance sheet')..."
+            value={currentInput}
+            onChange={(e) => setCurrentInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            disabled={loading}
+          />
+          <button onClick={() => handleSend()} disabled={loading || !currentInput.trim()}>
+            {loading ? '...' : 'Send'}
+          </button>
         </div>
-      </div>
-    </main>
+      </div >
+    </main >
   );
 }
