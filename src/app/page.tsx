@@ -14,7 +14,7 @@ export default function Home() {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Welcome back! I am your ISOLATERP Global AI Accountant. How can I assist you with your financial actions today?' }
   ]);
-  const [input, setInput] = useState('');
+  // const [input, setInput] = useState(''); // REPLACED by currentInput below
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_OPENAI_API_KEY || '');
   const [showSettings, setShowSettings] = useState(false);
@@ -135,19 +135,21 @@ export default function Home() {
   };
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!currentInput.trim()) return;
 
-    const userMessage = { role: 'user', content: input };
+    const userMessage = { role: 'user', content: currentInput };
     setMessages(prev => [...prev, userMessage]);
-    const currentInput = input;
-    setInput('');
+    const messageToSend = currentInput;
+    setCurrentInput('');
     setLoading(true);
+
+    const messageText = messageToSend; // Local copy for logic processing
 
     try {
       if (session.step === 'AUTH_EMAIL') {
-        const tenants = await authService.getTenants(currentInput);
+        const tenants = await authService.getTenants(messageText);
         if (tenants.result && tenants.result.length > 0) {
-          setSession(prev => ({ ...prev, step: 'AUTH_PASSWORD', data: { ...prev.data, email: currentInput, tenants: tenants.result } }));
+          setSession(prev => ({ ...prev, step: 'AUTH_PASSWORD', data: { ...prev.data, email: messageText, tenants: tenants.result } }));
           addAssistantMessage('Great. Now, please enter your password to continue.');
         } else {
           addAssistantMessage('I could not find any companies associated with that email. Please try again.');
@@ -155,7 +157,7 @@ export default function Home() {
       } else if (session.step === 'AUTH_PASSWORD') {
         const authData = await authService.login({
           userNameOrEmailAddress: session.data.email,
-          password: currentInput,
+          password: messageText,
           rememberClient: true
         });
 
@@ -169,7 +171,7 @@ export default function Home() {
         }
       } else if (session.step === 'TENANT_SELECTION') {
         const selectedTenant = session.data.tenants.find((t: any, i: number) =>
-          t.tenancyName.toLowerCase() === currentInput.toLowerCase() || (i + 1).toString() === currentInput
+          t.tenancyName.toLowerCase() === messageText.toLowerCase() || (i + 1).toString() === messageText
         );
 
         if (selectedTenant) {
@@ -180,8 +182,8 @@ export default function Home() {
           addAssistantMessage('Invalid selection. Please choose from the available companies.');
         }
       } else {
-        const intent = mapIntent(currentInput);
-        historyManager.saveInteraction(currentInput, intent);
+        const intent = mapIntent(messageText);
+        historyManager.saveInteraction(messageText, intent);
 
         if (intent.type === 'LOGIN') {
           if (intent.params.email && intent.params.password) {
@@ -273,7 +275,7 @@ export default function Home() {
               }
 
               // Process composite report requests
-              const lowerInput = currentInput.toLowerCase();
+              const lowerInput = messageText.toLowerCase();
               if (lowerInput.includes('balance sheet') || lowerInput.includes('report') || lowerInput.includes('pnl') || lowerInput.includes('profit')) {
                 addAssistantMessage('Fetching your financial data for the report...');
                 let pdfReport;
