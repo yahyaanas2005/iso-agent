@@ -351,38 +351,42 @@ export default function Home() {
         } else if (intent.type === 'SEARCH_CUSTOMER') {
           addAssistantMessage(`Searching for customer: "${intent.params.query}"...`);
           const res = await reportingService.getCustomers(intent.params.query);
-          if (res.result && res.result.length > 0) {
-            const list = res.result.map((c: any) => `• ${c.customerTitle} (ID: ${c.id})`).join('\n');
-            addAssistantMessage(`I found ${res.result.length} matching customers:\n\n${list}`);
+          const customers = res.result?.result || res.result || [];
+          if (customers && customers.length > 0) {
+            const list = customers.map((c: any) => `• ${c.customerTitle} (ID: ${c.id})`).join('\n');
+            addAssistantMessage(`I found ${customers.length} matching customers:\n\n${list}`);
           } else {
             addAssistantMessage(`No customers found matching "${intent.params.query}".`);
           }
         } else if (intent.type === 'LIST_CUSTOMERS') {
           addAssistantMessage('Retrieving customer list...');
           const res = await reportingService.getCustomers();
-          if (res.result) {
-            const list = res.result.map((c: any) => `• ${c.customerTitle}`).join('\n');
-            addAssistantMessage(`Found ${res.result.length} customers:\n\n${list}`);
+          const customers = res.result?.result || res.result || [];
+          if (Array.isArray(customers) && customers.length > 0) {
+            const list = customers.slice(0, 20).map((c: any) => `• ${c.customerTitle}`).join('\n');
+            addAssistantMessage(`Found ${customers.length} customers (showing top 20):\n\n${list}`);
           } else {
-            addAssistantMessage('Could not retrieve customers.');
+            addAssistantMessage('Could not retrieve customers or the list is empty.');
           }
         } else if (intent.type === 'LIST_ITEMS') {
           addAssistantMessage('Retrieving inventory items...');
           const res = await reportingService.getItems();
-          if (res.result) {
-            const list = res.result.map((i: any) => `• ${i.inventoryItemTitle}`).join('\n');
-            addAssistantMessage(`Found ${res.result.length} items in inventory:\n\n${list}`);
+          const items = res.result?.result || res.result || [];
+          if (Array.isArray(items) && items.length > 0) {
+            const list = items.slice(0, 20).map((i: any) => `• ${i.itemTitle || i.inventoryItemTitle}`).join('\n');
+            addAssistantMessage(`Found ${items.length} items in inventory (showing top 20):\n\n${list}`);
           } else {
-            addAssistantMessage('Could not retrieve items.');
+            addAssistantMessage('Could not retrieve items or the list is empty.');
           }
         } else if (intent.type === 'LIST_VENDORS') {
           addAssistantMessage('Retrieving vendor list...');
           const res = await reportingService.getVendors();
-          if (res.result) {
-            const list = res.result.map((v: any) => `• ${v.venderTitle}`).join('\n');
-            addAssistantMessage(`Found ${res.result.length} vendors:\n\n${list}`);
+          const vendors = res.result?.result || res.result || [];
+          if (Array.isArray(vendors) && vendors.length > 0) {
+            const list = vendors.slice(0, 20).map((v: any) => `• ${v.venderTitle || v.vendorTitle}`).join('\n');
+            addAssistantMessage(`Found ${vendors.length} vendors (showing top 20):\n\n${list}`);
           } else {
-            addAssistantMessage('Could not retrieve vendors.');
+            addAssistantMessage('Could not retrieve vendors or the list is empty.');
           }
         } else if (intent.type === 'HELP') {
           addAssistantMessage(`
@@ -413,7 +417,14 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
             addAssistantMessage(`Context switched to company (PIN: ${pin}). All subsequent requests will key off this Company ID.`);
           } else {
             setSession(prev => ({ ...prev, step: 'TENANT_SELECTION' }));
-            addAssistantMessage('Which company would you like to switch to?');
+            // Attempt to get list from session if available
+            const tenants = session.data?.tenants || [];
+            if (tenants.length > 0) {
+              const list = tenants.map((t: any, i: number) => `**${t.tenancyName}** (PIN: ${t.tenantId})`).join('\n');
+              addAssistantMessage(`Here are your available companies. Please switch using the name or **PIN**:\n\n${list}`);
+            } else {
+              addAssistantMessage('Which company would you like to switch to? (Tip: You can say "Switch PIN XYZ")');
+            }
           }
         } else {
           if (apiKey) {
