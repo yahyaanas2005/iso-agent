@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async rewrites() {
+    return [
+      {
+        source: '/erp-api/:path*',
+        destination: 'https://api.isolaterp.ai/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

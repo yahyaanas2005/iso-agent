@@ -1,4 +1,8 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.isolaterp.ai';
+const BASE_URL = '/erp-api';
+if (typeof window === 'undefined') {
+  // On server (during SSR/build), we might still need the absolute URL if it doesn't support relative rewrites
+  // but Next.js rewrites usually handle this.
+}
 
 export interface ApiResponse<T = any> {
   result: T;
