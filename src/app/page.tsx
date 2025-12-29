@@ -337,24 +337,23 @@ export default function Home() {
                 reportTitle = 'Balance Sheet';
               }
 
+              // Check nesting
+              const actualPdfStruct = pdfRes?.result || pdfRes;
+              const link = actualPdfStruct?.pdfLink;
+
+              const pdfUrl = link
+                ? (link.startsWith('http')
+                  ? link
+                  : `https://api.isolaterp.ai${link.startsWith('/') ? '' : '/'}${link}`)
+                : '#';
+
+              addAssistantMessage(`Generated your ${reportTitle} using real-time ERP data.`, 'report', {
+                title: reportTitle,
+                summary: 'Real-time financial summary.',
+                pdfLink: pdfUrl,
+                htmlData: realData
+              });
             }
-
-            // Check nesting
-            const actualPdfStruct = pdfRes?.result || pdfRes;
-            const link = actualPdfStruct?.pdfLink;
-
-            const pdfUrl = link
-              ? (link.startsWith('http')
-                ? link
-                : `https://api.isolaterp.ai${link.startsWith('/') ? '' : '/'}${link}`)
-              : '#';
-
-            addAssistantMessage(`Generated your ${reportTitle} using real-time ERP data.`, 'report', {
-              title: reportTitle,
-              summary: 'Real-time financial summary.',
-              pdfLink: pdfUrl,
-              htmlData: realData
-            });
           }
         } else if (intent.type === 'RECORD_PURCHASE') {
           if (!session.token) {
