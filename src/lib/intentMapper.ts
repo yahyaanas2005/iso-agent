@@ -9,10 +9,26 @@ export const mapIntent = (input: string): Intent => {
     const text = input.toLowerCase();
 
     if (text.includes('login') || text.includes('sign in') || text.includes('authenticate')) {
-        const email = input.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
+        const emailMatch = input.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+        const email = emailMatch?.[0];
+
+        // Strategy 1: Explicit "password [code]"
         const explicitPwMatch = input.match(/password\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/i);
+        // Strategy 2: "with [code]" or "and [code]"
         const genericPwMatch = input.match(/(?:is|and|with)\s+((?!email|password|tenant|login|sign)[a-zA-Z0-9!@#$%^&*()_+]{3,})/i);
-        const password = explicitPwMatch ? explicitPwMatch[1] : (genericPwMatch ? genericPwMatch[1] : null);
+
+        let password = explicitPwMatch ? explicitPwMatch[1] : (genericPwMatch ? genericPwMatch[1] : null);
+
+        // Strategy 3: Positional fallback "login [email] [password]"
+        if (!password && email) {
+            // Find token immediately after email
+            const parts = input.split(/\s+/);
+            const emailIndex = parts.findIndex(p => p.includes('@'));
+            if (emailIndex !== -1 && parts[emailIndex + 1] && !parts[emailIndex + 1].toLowerCase().includes('tenant')) {
+                password = parts[emailIndex + 1];
+            }
+        }
+
         const tenantMatch = input.match(/tenant\s+([a-zA-Z0-9]+)/i);
         const tenantId = tenantMatch ? tenantMatch[1] : null;
 

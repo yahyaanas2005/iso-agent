@@ -146,7 +146,11 @@ export default function Home() {
     const messageText = messageToSend; // Local copy for logic processing
 
     try {
-      if (session.step === 'AUTH_EMAIL') {
+      // Check if user is trying to issue a new command (like "login ...") even while in an auth step
+      const potentialIntent = mapIntent(messageText);
+      const isNewLoginCommand = potentialIntent.type === 'LOGIN' && potentialIntent.params.email;
+
+      if (!isNewLoginCommand && session.step === 'AUTH_EMAIL') {
         const tenants = await authService.getTenants(messageText);
         if (tenants.result && tenants.result.length > 0) {
           setSession(prev => ({ ...prev, step: 'AUTH_PASSWORD', data: { ...prev.data, email: messageText, tenants: tenants.result } }));
@@ -154,7 +158,7 @@ export default function Home() {
         } else {
           addAssistantMessage('I could not find any companies associated with that email. Please try again.');
         }
-      } else if (session.step === 'AUTH_PASSWORD') {
+      } else if (!isNewLoginCommand && session.step === 'AUTH_PASSWORD') {
         const authData = await authService.login({
           userNameOrEmailAddress: session.data.email,
           password: messageText,
@@ -169,7 +173,7 @@ export default function Home() {
         } else {
           addAssistantMessage('Incorrect password. Please try again.');
         }
-      } else if (session.step === 'TENANT_SELECTION') {
+      } else if (!isNewLoginCommand && session.step === 'TENANT_SELECTION') {
         const selectedTenant = session.data.tenants.find((t: any, i: number) =>
           t.tenancyName.toLowerCase() === messageText.toLowerCase() || (i + 1).toString() === messageText
         );
