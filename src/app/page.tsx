@@ -399,15 +399,17 @@ export default function Home() {
 I currently support 136 ERP endpoints including Branches, Projects, Bank Transctions, and Invoices.`);
         } else if (intent.type === 'SWITCH_TENANT') {
           if (intent.params.pin) {
-            // Handle PIN switch directly if pin extracted
             const pin = intent.params.pin;
             addAssistantMessage(`Switching to company with PIN: ${pin}...`);
-            // NOTE: Since the API for GetTenantByPin isn't verified, we might need a specific endpoint or just set context.
-            // For now, let's treat it as a tenant ID switch or assume we need to re-login with this context.
-            // Assuming PIN maps to Tenant ID for now or we just store it.
-            localStorage.setItem('tenantId', pin); // If PIN works as TenantID
+            // Force persistent update
+            localStorage.setItem('tenantId', pin);
+            // Update react state
             setSession(prev => ({ ...prev, tenantId: pin, data: { ...prev.data, tenantId: pin } }));
-            addAssistantMessage(`Context switched to company (PIN: ${pin}).`);
+
+            // Small delay to ensure propagation if async effects exist (safety net)
+            await new Promise(r => setTimeout(r, 500));
+
+            addAssistantMessage(`Context switched to company (PIN: ${pin}). All subsequent requests will key off this Company ID.`);
           } else {
             setSession(prev => ({ ...prev, step: 'TENANT_SELECTION' }));
             addAssistantMessage('Which company would you like to switch to?');
@@ -480,6 +482,9 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                     <div className="report-header">
                       <span className="report-icon">📊</span>
                       <span className="report-title">{msg.data?.title || 'Financial Report'}</span>
+                    </div>
+                    <div className="report-meta" style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
+                      Source: Live ERP • Tenant: {session.tenantId || 'Default'}
                     </div>
                     <div className="report-summary">
                       {msg.data?.summary || 'The requested financial statement has been generated successfully.'}

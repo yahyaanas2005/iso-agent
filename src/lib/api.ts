@@ -22,6 +22,9 @@ export const api = async (path: string, options: RequestInit = {}) => {
   }
   if (tenantId) {
     headers.set('Abp-TenantId', tenantId);
+    console.log(`[API] Fetching ${path} for Tenant: ${tenantId}`);
+  } else {
+    console.log(`[API] Fetching ${path} (No Tenant Context)`);
   }
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
