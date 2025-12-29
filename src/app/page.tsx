@@ -202,20 +202,41 @@ export default function Home() {
             });
 
             if (authData.result && authData.result.accessToken) {
-              localStorage.setItem('token', authData.result.accessToken);
-              if (explicitTenantId) {
+              const token = authData.result.accessToken;
+              localStorage.setItem('token', token);
+
+              let finalTenantId = explicitTenantId;
+              let finalTenantName = activeTenant;
+
+              // Auto-Resolve Tenant if not provided
+              if (!explicitTenantId) {
+                addAssistantMessage('Checking for associated companies...');
+                const tenantRes = await authService.getTenants(intent.params.email);
+                const tenants = tenantRes.result || [];
+                if (tenants.length > 0) {
+                  // Auto-select first tenant
+                  finalTenantId = tenants[0].tenantId;
+                  finalTenantName = tenants[0].tenancyName;
+                  localStorage.setItem('tenantId', finalTenantId.toString());
+                  addAssistantMessage(`Automatically logged into default company: **${finalTenantName}** (PIN: ${finalTenantId}).`);
+                } else {
+                  addAssistantMessage('No companies found for this account. You are logged in as Host.');
+                }
+              } else {
                 localStorage.setItem('tenantId', explicitTenantId);
               }
 
               setSession(prev => ({
                 ...prev,
-                token: authData.result.accessToken,
+                token: token,
                 step: 'READY',
-                tenantId: explicitTenantId || null,
-                data: { ...prev.data, email: intent.params.email, tenantId: activeTenant }
+                tenantId: finalTenantId,
+                data: { ...prev.data, email: intent.params.email, tenantId: finalTenantName, tenants: [] } // Clear tenants list 
               }));
 
-              addAssistantMessage(`Successfully authenticated! Current company context: ${activeTenant}.`);
+              if (explicitTenantId) {
+                addAssistantMessage(`Successfully authenticated! Current company context: ${finalTenantName}.`);
+              }
 
               // Process composite report requests
               const lowerInput = currentInput.toLowerCase();
@@ -239,10 +260,14 @@ export default function Home() {
                   reportTitle = 'Balance Sheet';
                 }
 
-                const pdfUrl = pdfReport?.pdfLink
-                  ? (pdfReport.pdfLink.startsWith('http')
-                    ? pdfReport.pdfLink
-                    : `https://api.isolaterp.ai${pdfReport.pdfLink.startsWith('/') ? '' : '/'}${pdfReport.pdfLink}`)
+                // Check nesting: API returns { result: { pdfLink: "..." } } usually
+                const actualPdfStruct = pdfReport?.result || pdfReport;
+                const link = actualPdfStruct?.pdfLink;
+
+                const pdfUrl = link
+                  ? (link.startsWith('http')
+                    ? link
+                    : `https://api.isolaterp.ai${link.startsWith('/') ? '' : '/'}${link}`)
                   : '#';
 
                 addAssistantMessage(`Your ${reportTitle} is ready!`, 'report', {
@@ -312,19 +337,24 @@ export default function Home() {
                 reportTitle = 'Balance Sheet';
               }
 
-              const pdfUrl = pdfRes?.pdfLink
-                ? (pdfRes.pdfLink.startsWith('http')
-                  ? pdfRes.pdfLink
-                  : `https://api.isolaterp.ai${pdfRes.pdfLink.startsWith('/') ? '' : '/'}${pdfRes.pdfLink}`)
-                : '#';
-
-              addAssistantMessage(`Generated your ${reportTitle} using real-time ERP data.`, 'report', {
-                title: reportTitle,
-                summary: 'Real-time financial summary.',
-                pdfLink: pdfUrl,
-                htmlData: realData
-              });
             }
+
+            // Check nesting
+            const actualPdfStruct = pdfRes?.result || pdfRes;
+            const link = actualPdfStruct?.pdfLink;
+
+            const pdfUrl = link
+              ? (link.startsWith('http')
+                ? link
+                : `https://api.isolaterp.ai${link.startsWith('/') ? '' : '/'}${link}`)
+              : '#';
+
+            addAssistantMessage(`Generated your ${reportTitle} using real-time ERP data.`, 'report', {
+              title: reportTitle,
+              summary: 'Real-time financial summary.',
+              pdfLink: pdfUrl,
+              htmlData: realData
+            });
           }
         } else if (intent.type === 'RECORD_PURCHASE') {
           if (!session.token) {
