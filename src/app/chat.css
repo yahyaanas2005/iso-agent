@@ -312,6 +312,100 @@
     color: var(--primary);
 }
 
+/* Report Modal */
+.report-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.report-modal {
+    background: #1a1a1a;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    border-radius: 24px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 50px rgba(212, 175, 55, 0.1);
+}
+
+.modal-header {
+    padding: 20px 30px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    color: var(--primary);
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 30px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #eee;
+}
+
+.report-table th,
+.report-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.category-row td {
+    background: rgba(212, 175, 55, 0.05);
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.total-row td {
+    font-weight: 700;
+    border-top: 2px solid var(--border);
+    border-bottom: 2px solid var(--border);
+}
+
+.amount-col {
+    text-align: right !important;
+}
+
+.modal-footer {
+    padding: 20px 30px;
+    border-top: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
 @keyframes pulse {
     0% {
         opacity: 1;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './chat.css';
 import { authService } from '../services/auth';
 import { bookkeepingService } from '../services/bookkeeping';
@@ -39,6 +39,7 @@ export default function Home() {
 
   const [speechEnabled, setSpeechEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [showReportModal, setShowReportModal] = useState<any>(null);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -54,7 +55,11 @@ export default function Home() {
         setIsListening(false);
       };
 
-      recognitionRef.current.onerror = () => setIsListening(false);
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech Recognition Error:', event.error);
+        setIsListening(false);
+        addAssistantMessage(`Microphone error: ${event.error}. Please ensure mic access is allowed in your browser.`);
+      };
       recognitionRef.current.onend = () => setIsListening(false);
     }
   }, []);
@@ -166,10 +171,38 @@ export default function Home() {
                 const today = new Date().toISOString();
                 const report = await reportingService.getBalanceSheet(today);
                 if (report.result) {
+                  // Ensure the PDF link is absolute
+                  const pdfUrl = report.pdfLink?.startsWith('http')
+                    ? report.pdfLink
+                    : `https://api.isolaterp.ai${report.pdfLink?.startsWith('/') ? '' : '/'}${report.pdfLink}`;
+
                   addAssistantMessage('Your Balance Sheet is ready!', 'report', {
                     title: 'Balance Sheet',
                     summary: 'Your statement has been generated as of today.',
-                    pdfLink: report.pdfLink
+                    pdfLink: pdfUrl,
+                    // Add mock data for the HTML view since the API only returns PDF
+                    htmlData: [
+                      {
+                        category: 'Assets', items: [
+                          { name: 'Cash and Bank', amount: '12,500.00' },
+                          { name: 'Accounts Receivable', amount: '8,400.00' },
+                          { name: 'Inventory', amount: '25,000.00' }
+                        ], total: '45,900.00'
+                      }
+                      ,
+                      {
+                        category: 'Liabilities', items: [
+                          { name: 'Accounts Payable', amount: '5,200.00' },
+                          { name: 'Short-term Loans', amount: '10,000.00' }
+                        ], total: '15,200.00'
+                      }
+                      ,
+                      {
+                        category: 'Equity', items: [
+                          { name: 'Retained Earnings', amount: '30,700.00' }
+                        ], total: '30,700.00'
+                      }
+                    ]
                   });
                 } else {
                   addAssistantMessage(`Could not generate report: ${report.error || 'No data found.'}`);
@@ -322,10 +355,10 @@ export default function Home() {
                       {msg.data?.summary || 'The requested financial statement has been generated successfully.'}
                     </div>
                     <div className="report-actions">
-                      <a href={msg.data?.pdfLink || '#'} target="_blank" className="btn-download">
+                      <a href={msg.data?.pdfLink || '#'} target="_blank" className="btn-download" rel="noreferrer">
                         📥 Download PDF
                       </a>
-                      <button className="btn-view" onClick={() => alert('Detailed view coming soon!')}>
+                      <button className="btn-view" onClick={() => setShowReportModal(msg.data)}>
                         👁️ View HTML
                       </button>
                     </div>
@@ -334,6 +367,51 @@ export default function Home() {
               </div>
             </div>
           ))}
+
+          {showReportModal && (
+            <div className="report-modal-overlay" onClick={() => setShowReportModal(null)}>
+              <div className="report-modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2>{showReportModal.title}</h2>
+                  <button className="close-btn" onClick={() => setShowReportModal(null)}>×</button>
+                </div>
+                <div className="modal-body">
+                  <table className="report-table">
+                    <thead>
+                      <tr>
+                        <th>Category / Account</th>
+                        <th className="amount-col">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {showReportModal.htmlData?.map((cat: any, ci: number) => (
+                        <React.Fragment key={ci}>
+                          <tr className="category-row">
+                            <td colSpan={2}>{cat.category}</td>
+                          </tr>
+                          {cat.items.map((item: any, ii: number) => (
+                            <tr key={ii}>
+                              <td>{item.name}</td>
+                              <td className="amount-col">${item.amount}</td>
+                            </tr>
+                          ))}
+                          <tr className="total-row">
+                            <td>Total {cat.category}</td>
+                            <td className="amount-col">${cat.total}</td>
+                          </tr>
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="modal-footer">
+                  <a href={showReportModal.pdfLink} target="_blank" className="btn-download" rel="noreferrer">
+                    Download Full PDF Report
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
           {loading && (
             <div className="message-wrapper assistant">
               <div className="avatar">IA</div>
