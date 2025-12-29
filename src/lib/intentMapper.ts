@@ -12,11 +12,12 @@ export const mapIntent = (input: string): Intent => {
         // Extract from ORIGINAL input to preserve case
         const email = input.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
 
-        // Look for password after keywords in the ORIGINAL input
-        // Keywords are case-insensitive, but capture is as-is
-        // Removing 'with' to avoid matching 'with email'
-        const pwMatch = input.match(/(?:password|is|and)\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/i);
-        const password = pwMatch ? pwMatch[1] : null;
+        // 1. Try to find password explicitly prefixed with 'password'
+        const explicitPwMatch = input.match(/password\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/i);
+        // 2. Fallback to generic keywords but EXCLUDE other structural words
+        const genericPwMatch = input.match(/(?:is|and|with)\s+((?!email|password|tenant|login|sign)[a-zA-Z0-9!@#$%^&*()_+]{3,})/i);
+
+        const password = explicitPwMatch ? explicitPwMatch[1] : (genericPwMatch ? genericPwMatch[1] : null);
 
         // Extract Tenant ID from ORIGINAL input (e.g. "tenant O1EG681Y4V")
         const tenantMatch = input.match(/tenant\s+([a-zA-Z0-9]+)/i);
