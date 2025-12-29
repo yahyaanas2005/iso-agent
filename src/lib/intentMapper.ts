@@ -32,15 +32,18 @@ export const mapIntent = (input: string): Intent => {
         return { type: 'SEARCH_CUSTOMER', params: { query } };
     }
 
-    if (text.includes('customer') || text.includes('client')) {
+    // List Customers (Exclude creation commands)
+    if ((text.includes('customer') || text.includes('client')) && !text.includes('create') && !text.includes('add') && !text.includes('new')) {
         return { type: 'LIST_CUSTOMERS', params: {} };
     }
 
-    if (text.includes('item') || text.includes('inventory') || text.includes('stock')) {
+    // List Items (Exclude creation commands)
+    if ((text.includes('item') || text.includes('inventory') || text.includes('stock')) && !text.includes('create') && !text.includes('add') && !text.includes('new')) {
         return { type: 'LIST_ITEMS', params: {} };
     }
 
-    if (text.includes('vendor') || text.includes('supplier')) {
+    // List Vendors (Exclude creation commands)
+    if ((text.includes('vendor') || text.includes('supplier')) && !text.includes('create') && !text.includes('add') && !text.includes('new')) {
         return { type: 'LIST_VENDORS', params: {} };
     }
 
