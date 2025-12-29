@@ -9,7 +9,12 @@ export const mapIntent = (input: string): Intent => {
     const text = input.toLowerCase();
 
     if (text.includes('login') || text.includes('sign in')) {
-        return { type: 'LOGIN', params: {} };
+        const email = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
+        // Look for password after keywords like "password", "with", "and" or just a standalone string at the end
+        const pwMatch = text.match(/(?:password|with|and)\s+([a-zA-Z0-9!@#$%^&*()_+]+)/);
+        const password = pwMatch ? pwMatch[1] : null;
+
+        return { type: 'LOGIN', params: { email, password } };
     }
 
     if (text.includes('sale') || text.includes('invoice') || text.includes('sold')) {

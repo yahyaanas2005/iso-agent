@@ -21,17 +21,27 @@ export const api = async (path: string, options: RequestInit = {}) => {
   }
   headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(`${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
+      ...options,
+      headers,
+    });
 
-  if (response.status === 401 || response.status === 403) {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      // Potential redirect or callback for logout can be handled here
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+      }
     }
-  }
 
-  return response.json();
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json();
+    } else {
+      const text = await response.text();
+      return { success: response.ok, result: text, error: response.ok ? null : `API Error: ${response.status}` };
+    }
+  } catch (error) {
+    console.error('API Fetch Error:', error);
+    return { success: false, result: null, error: 'Network or connection error. Please verify the API endpoint is accessible.' };
+  }
 };

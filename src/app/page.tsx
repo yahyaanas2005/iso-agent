@@ -91,8 +91,31 @@ export default function Home() {
         historyManager.saveInteraction(currentInput, intent);
 
         if (intent.type === 'LOGIN') {
-          setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));
-          addAssistantMessage('I am ready to help you sign in. Please provide your email address.');
+          if (intent.params.email && intent.params.password) {
+            addAssistantMessage('Detecting account details... Automatically signing you in.');
+            const tenants = await authService.getTenants(intent.params.email);
+            if (tenants.result && tenants.result.length > 0) {
+              const authData = await authService.login({
+                userNameOrEmailAddress: intent.params.email,
+                password: intent.params.password,
+                rememberClient: true
+              });
+              if (authData.result?.accessToken) {
+                localStorage.setItem('token', authData.result.accessToken);
+                const tenantList = tenants.result.map((t: any, i: number) => `${i + 1}. ${t.tenancyName}`).join('\n');
+                setSession(prev => ({ ...prev, token: authData.result.accessToken, step: 'TENANT_SELECTION', data: { ...prev.data, tenants: tenants.result } }));
+                addAssistantMessage(`Welcome! Please confirm your company for this session:\n\n${tenantList}`);
+              } else {
+                addAssistantMessage('I found your companies, but the password was incorrect. Please try again.');
+                setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));
+              }
+            } else {
+              addAssistantMessage('I could not find any companies with that email. Please check your credentials.');
+            }
+          } else {
+            setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));
+            addAssistantMessage('I am ready to help you sign in. Please provide your email address.');
+          }
         } else if (intent.type === 'RECORD_SALE') {
           if (!session.token) {
             addAssistantMessage('You need to be signed in to record a sale. Would you like to log in now?');
@@ -109,24 +132,28 @@ export default function Home() {
                 { itemTitle: 'General Item', unitPrice: intent.params.amount || '0', quantity: '1' }
               ]
             });
-            if (result.success) {
-              if (!apiKey) addAssistantMessage(`Successfully recorded sale. Invoice No: ${result.result.invoiceNo}, Voucher: ${result.result.voucherNumber}. Would you like the PDF link?`);
-            } else {
+            if (result.success && !apiKey) {
+              addAssistantMessage(`Successfully recorded sale. Invoice No: ${result.result.invoiceNo}, Voucher: ${result.result.voucherNumber}. Would you like the PDF link?`);
+            } else if (!result.success) {
               addAssistantMessage(`Failed to record sale: ${result.error || 'Unknown error'}`);
             }
           }
         } else if (intent.type === 'GET_REPORT') {
-          if (apiKey) {
-            const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
-            addAssistantMessage(aiMsg);
+          if (!session.token) {
+            addAssistantMessage('I can help with reports! Please log in first so I can access your data.');
           } else {
-            addAssistantMessage('Generating your financial report... One moment.');
-          }
-          const result = await reportingService.getVoucherReport({ BranchTitle: 'All' });
-          if (result.success) {
-            if (!apiKey) addAssistantMessage('Your report is ready! I found several vouchers for this period. Should I summarize them for you?');
-          } else {
-            addAssistantMessage(`Could not fetch report: ${result.error || 'Access denied'}`);
+            if (apiKey) {
+              const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
+              addAssistantMessage(aiMsg);
+            } else {
+              addAssistantMessage('Preparing your financial reports (Balance Sheet / P&L)... One moment.');
+            }
+            const result = await reportingService.getVoucherReport({ BranchTitle: 'All' });
+            if (result.success && !apiKey) {
+              addAssistantMessage('Your reports are ready! I found several transactions. Should I summarize the Balance Sheet for you?');
+            } else if (!result.success) {
+              addAssistantMessage(`Could not fetch report: ${result.error || 'Access denied'}`);
+            }
           }
         } else if (intent.type === 'RECORD_PURCHASE') {
           if (!session.token) {
@@ -144,9 +171,9 @@ export default function Home() {
                 { itemTitle: 'General Expense', unitPrice: intent.params.amount || '0', quantity: '1' }
               ]
             });
-            if (result.success) {
-              if (!apiKey) addAssistantMessage(`Successfully recorded purchase. Bill No: ${result.result.billNo}, Voucher: ${result.result.voucherNumber}.`);
-            } else {
+            if (result.success && !apiKey) {
+              addAssistantMessage(`Successfully recorded purchase. Bill No: ${result.result.billNo}, Voucher: ${result.result.voucherNumber}.`);
+            } else if (!result.success) {
               addAssistantMessage(`Failed to record purchase: ${result.error || 'Unknown error'}`);
             }
           }
