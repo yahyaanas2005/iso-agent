@@ -1,10 +1,12 @@
+import { ERP_API_KNOWLEDGE } from '../lib/erpApiKnowledge';
+
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 export const aiService = {
-    getAccountantResponse: async (messages: any[], apiKey: string) => {
-        const systemPrompt = {
-            role: 'system',
-            content: `You are the ISOLATERP Senior Global AI Accountant. 
+   getAccountantResponse: async (messages: any[], apiKey: string) => {
+      const systemPrompt = {
+         role: 'system',
+         content: `You are the ISOLATERP Senior Global AI Accountant. 
       Your tone is strictly professional, business-oriented, and adheres to high financial and accounting standards.
       
       ## CAPABILITIES & API KNOWLEDGE
@@ -65,14 +67,16 @@ export const aiService = {
       }
       \`\`\`
       
-      If it is a general question, just reply with text.`
+      If it is a general question, just reply with text.
+      
+      \${ERP_API_KNOWLEDGE}\`
         };
 
         const response = await fetch(OPENAI_API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${ apiKey }`,
             },
             body: JSON.stringify({
                 model: 'gpt-4o-mini',
