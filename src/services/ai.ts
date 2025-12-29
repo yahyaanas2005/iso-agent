@@ -12,12 +12,12 @@ export const aiService = {
       ## CAPABILITIES & API KNOWLEDGE
       You have direct access to the ISOLATERP ERP. When the user asks to perform an action (like creating a customer, item, or recording a transaction), you MUST output a JSON object to execute the command.
       
-      ## API DEFINITIONS
+      ## KEY API DEFINITIONS (Shortlist)
       1. **Create Customer**:
          - Endpoint: /api/services/app/Customer/CreateCustomerInfo
          - Method: POST
          - Body: { "customerTitle": "Name", "address": "...", "phone": "...", "email": "..." }
-         
+      
       2. **Create Inventory Item**:
           - Endpoint: /api/services/app/Item/CreateInventoryItem
          - Method: POST
@@ -69,27 +69,27 @@ export const aiService = {
       
       If it is a general question, just reply with text.
       
-      \${ERP_API_KNOWLEDGE}\`
-        };
+      ${ERP_API_KNOWLEDGE}`
+      };
 
-        const response = await fetch(OPENAI_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${ apiKey }`,
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o-mini',
-                messages: [systemPrompt, ...messages],
-                temperature: 0.3,
-            }),
-        });
+      const response = await fetch(OPENAI_API_URL, {
+         method: 'POST',
+         headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+         },
+         body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [systemPrompt, ...messages],
+            temperature: 0.3,
+         }),
+      });
 
-        if (!response.ok) {
-            throw new Error('AI Service failed to respond.');
-        }
+      if (!response.ok) {
+         throw new Error('AI Service failed to respond.');
+      }
 
-        const data = await response.json();
-        return data.choices[0].message.content;
-    }
+      const data = await response.json();
+      return data.choices[0].message.content;
+   }
 };
