@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import './chat.css';
+import { api } from '../lib/api'; // Ensure api import is available
 import { authService } from '../services/auth';
 import { bookkeepingService } from '../services/bookkeeping';
 import { reportingService } from '../services/reporting';
@@ -416,14 +417,45 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
           }
         } else {
           if (apiKey) {
-            const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
-            addAssistantMessage(aiMsg);
+            let aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
+
+            // Check for valid JSON block with action
+            const jsonMatch = aiMsg.match(/```json\n([\s\S]*?)\n```/) || aiMsg.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try {
+                const rawJson = jsonMatch[1] || jsonMatch[0];
+                const actionData = JSON.parse(rawJson);
+
+                if (actionData.action === 'EXECUTE_API' && actionData.endpoint) {
+                  addAssistantMessage(`Executing action on ${actionData.endpoint}...`);
+                  const result = await api(actionData.endpoint, {
+                    method: actionData.method || 'POST',
+                    body: JSON.stringify(actionData.body || {})
+                  });
+
+                  if (result.success) {
+                    addAssistantMessage(actionData.successMessage || 'Action completed successfully.');
+                  } else {
+                    addAssistantMessage(`Action failed: ${result.error || 'Unknown error'}`);
+                  }
+                } else {
+                  // Just a regular message that happened to look like JSON or unhandled action
+                  addAssistantMessage(aiMsg.replace(/```json[\s\S]*```/, '').trim() || aiMsg);
+                }
+              } catch (e) {
+                // Failed to parse or execute, just show message
+                addAssistantMessage(aiMsg);
+              }
+            } else {
+              addAssistantMessage(aiMsg);
+            }
           } else {
             addAssistantMessage("I'm not sure how to handle that request yet. I can help with bookkeeping, reports, and tenant management.");
           }
         }
       }
     } catch (error) {
+      console.error(error);
       addAssistantMessage('Sorry, I encountered an error. Please try again or check your connection.');
     } finally {
       setLoading(false);
