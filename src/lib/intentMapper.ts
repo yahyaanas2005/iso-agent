@@ -10,11 +10,15 @@ export const mapIntent = (input: string): Intent => {
 
     if (text.includes('login') || text.includes('sign in') || text.includes('authenticate')) {
         const email = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
-        // Look for password after keywords like "password", "with", "and" or "is"
+        // Look for password after keywords
         const pwMatch = text.match(/(?:password|with|and|is)\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/);
         const password = pwMatch ? pwMatch[1] : null;
 
-        return { type: 'LOGIN', params: { email, password } };
+        // Extract Tenant ID if provided (e.g. "tenant O1EG681Y4V")
+        const tenantMatch = text.match(/tenant\s+([a-zA-Z0-9]+)/i);
+        const tenantId = tenantMatch ? tenantMatch[1] : null;
+
+        return { type: 'LOGIN', params: { email, password, tenantId } };
     }
 
     // Prioritize Reports/Ledgers over recording actions
