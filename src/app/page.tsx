@@ -84,6 +84,51 @@ export default function Home() {
     speak(content);
   };
 
+  const fetchRealReportData = async () => {
+    try {
+      const [invoices, bills, banks] = await Promise.all([
+        reportingService.getInvoices(),
+        reportingService.getBills(),
+        reportingService.getBanks()
+      ]);
+
+      const totalSales = (invoices.result?.result || []).reduce((sum: number, inv: any) => sum + (inv.netValue || 0), 0);
+      const totalPurchases = (bills.result?.result || []).reduce((sum: number, bill: any) => sum + (bill.netValue || 0), 0);
+      const bankList = banks.result || [];
+      const totalBank = bankList.reduce((sum: number, b: any) => sum + (b.balance || 0), 0);
+
+      return [
+        {
+          category: 'Assets',
+          items: [
+            { name: 'Cash and Bank', amount: totalBank.toLocaleString() },
+            { name: 'Accounts Receivable (Sales)', amount: totalSales.toLocaleString() }
+          ],
+          total: (totalBank + totalSales).toLocaleString()
+        },
+        {
+          category: 'Liabilities',
+          items: [
+            { name: 'Accounts Payable (Purchases)', amount: totalPurchases.toLocaleString() }
+          ],
+          total: totalPurchases.toLocaleString()
+        },
+        {
+          category: 'Equity',
+          items: [
+            { name: 'Current Period Earnings', amount: (totalSales - totalPurchases).toLocaleString() }
+          ],
+          total: (totalSales - totalPurchases).toLocaleString()
+        }
+      ];
+    } catch (error) {
+      console.error('Error fetching real report data:', error);
+      return [
+        { category: 'Error', items: [{ name: 'Failed to fetch live data', amount: '0' }], total: '0' }
+      ];
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -166,47 +211,22 @@ export default function Home() {
               addAssistantMessage(`Successfully authenticated! Current company context: ${activeTenant}.`);
 
               // Process composite report requests
-              if (currentInput.toLowerCase().includes('balance sheet')) {
-                addAssistantMessage('Fetching your Balance Sheet...');
-                const today = new Date().toISOString();
-                const report = await reportingService.getBalanceSheet(today);
-                if (report.result) {
-                  // Ensure the PDF link is absolute
-                  const pdfUrl = report.pdfLink?.startsWith('http')
-                    ? report.pdfLink
-                    : `https://api.isolaterp.ai${report.pdfLink?.startsWith('/') ? '' : '/'}${report.pdfLink}`;
+              if (currentInput.toLowerCase().includes('balance sheet') || currentInput.toLowerCase().includes('report') || currentInput.toLowerCase().includes('pnl')) {
+                addAssistantMessage('Fetching your financial data for the report...');
+                const realData = await fetchRealReportData();
 
-                  addAssistantMessage('Your Balance Sheet is ready!', 'report', {
-                    title: 'Balance Sheet',
-                    summary: 'Your statement has been generated as of today.',
-                    pdfLink: pdfUrl,
-                    // Add mock data for the HTML view since the API only returns PDF
-                    htmlData: [
-                      {
-                        category: 'Assets', items: [
-                          { name: 'Cash and Bank', amount: '12,500.00' },
-                          { name: 'Accounts Receivable', amount: '8,400.00' },
-                          { name: 'Inventory', amount: '25,000.00' }
-                        ], total: '45,900.00'
-                      }
-                      ,
-                      {
-                        category: 'Liabilities', items: [
-                          { name: 'Accounts Payable', amount: '5,200.00' },
-                          { name: 'Short-term Loans', amount: '10,000.00' }
-                        ], total: '15,200.00'
-                      }
-                      ,
-                      {
-                        category: 'Equity', items: [
-                          { name: 'Retained Earnings', amount: '30,700.00' }
-                        ], total: '30,700.00'
-                      }
-                    ]
-                  });
-                } else {
-                  addAssistantMessage(`Could not generate report: ${report.error || 'No data found.'}`);
-                }
+                const today = new Date().toISOString();
+                const pdfReport = await reportingService.getBalanceSheet(today);
+                const pdfUrl = pdfReport.pdfLink?.startsWith('http')
+                  ? pdfReport.pdfLink
+                  : `https://api.isolaterp.ai${pdfReport.pdfLink?.startsWith('/') ? '' : '/'}${pdfReport.pdfLink}`;
+
+                addAssistantMessage('Your Balance Sheet is ready!', 'report', {
+                  title: 'Balance Sheet',
+                  summary: 'Your statement has been generated with live data from your ERP.',
+                  pdfLink: pdfUrl,
+                  htmlData: realData
+                });
               }
               return;
             } else {
@@ -251,13 +271,21 @@ export default function Home() {
               const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
               addAssistantMessage(aiMsg);
             } else {
-              addAssistantMessage('Preparing your financial reports (Balance Sheet / P&L)... One moment.');
-            }
-            const result = await reportingService.getVoucherReport({ BranchTitle: 'All' });
-            if (result.success && !apiKey) {
-              addAssistantMessage('Your reports are ready! I found several transactions. Should I summarize the Balance Sheet for you?');
-            } else if (!result.success) {
-              addAssistantMessage(`Could not fetch report: ${result.error || 'Access denied'}`);
+              addAssistantMessage('Fetching live data for your report...');
+              const realData = await fetchRealReportData();
+
+              const today = new Date().toISOString();
+              const pdfReport = await reportingService.getBalanceSheet(today);
+              const pdfUrl = pdfReport.pdfLink?.startsWith('http')
+                ? pdfReport.pdfLink
+                : `https://api.isolaterp.ai${pdfReport.pdfLink?.startsWith('/') ? '' : '/'}${pdfReport.pdfLink}`;
+
+              addAssistantMessage('Generated your Balance Sheet using real-time ERP data.', 'report', {
+                title: 'Balance Sheet',
+                summary: 'Real-time financial summary.',
+                pdfLink: pdfUrl,
+                htmlData: realData
+              });
             }
           }
         } else if (intent.type === 'RECORD_PURCHASE') {

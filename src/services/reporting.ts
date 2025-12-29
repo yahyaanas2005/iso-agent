@@ -19,6 +19,21 @@ export const reportingService = {
             body: JSON.stringify({ fromdate: fromDate, todate: toDate }),
         });
     },
+    getInvoices: async () => {
+        return api('/api/services/app/InvoiceInfo/GetInvoiceInfoList', {
+            method: 'GET'
+        });
+    },
+    getBills: async () => {
+        return api('/api/services/app/BillingInfo/GetBillingInfoList', {
+            method: 'GET'
+        });
+    },
+    getBanks: async () => {
+        return api('/api/services/app/Bank/GetBanks', {
+            method: 'GET'
+        });
+    },
     getBankInfo: async () => {
         return api('/api/services/app/Bank/GetBankInfoList', {
             method: 'GET',
