@@ -92,25 +92,34 @@ export default function Home() {
 
         if (intent.type === 'LOGIN') {
           if (intent.params.email && intent.params.password) {
-            addAssistantMessage('Detecting account details... Automatically signing you in.');
+            addAssistantMessage(`Attempting to find companies for email: ${intent.params.email}...`);
             const tenants = await authService.getTenants(intent.params.email);
-            if (tenants.result && tenants.result.length > 0) {
+
+            if (tenants.result && Array.isArray(tenants.result) && tenants.result.length > 0) {
+              addAssistantMessage(`Found ${tenants.result.length} companies. Authenticating...`);
               const authData = await authService.login({
                 userNameOrEmailAddress: intent.params.email,
                 password: intent.params.password,
                 rememberClient: true
               });
+
               if (authData.result?.accessToken) {
                 localStorage.setItem('token', authData.result.accessToken);
                 const tenantList = tenants.result.map((t: any, i: number) => `${i + 1}. ${t.tenancyName}`).join('\n');
-                setSession(prev => ({ ...prev, token: authData.result.accessToken, step: 'TENANT_SELECTION', data: { ...prev.data, tenants: tenants.result } }));
-                addAssistantMessage(`Welcome! Please confirm your company for this session:\n\n${tenantList}`);
+                setSession(prev => ({
+                  ...prev,
+                  token: authData.result.accessToken,
+                  step: 'TENANT_SELECTION',
+                  data: { ...prev.data, email: intent.params.email, tenants: tenants.result }
+                }));
+                addAssistantMessage(`Authentication successful! Please select a company from the list (type the name or number):\n\n${tenantList}`);
               } else {
-                addAssistantMessage('I found your companies, but the password was incorrect. Please try again.');
-                setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));
+                addAssistantMessage(`Account found, but password was incorrect for ${intent.params.email}. Please try again.`);
+                setSession(prev => ({ ...prev, step: 'AUTH_PASSWORD', data: { ...prev.data, email: intent.params.email, tenants: tenants.result } }));
               }
             } else {
-              addAssistantMessage('I could not find any companies with that email. Please check your credentials.');
+              addAssistantMessage(`I could not find any companies associated with "${intent.params.email}". Double check the email address or register your tenant.`);
+              console.log('Discovery failed for:', intent.params.email, tenants);
             }
           } else {
             setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));
