@@ -212,3 +212,116 @@
     background: var(--border);
     border-radius: 10px;
 }
+
+/* Report Card Styling */
+.report-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    min-width: 280px;
+}
+
+.report-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+}
+
+.report-icon {
+    font-size: 24px;
+}
+
+.report-title {
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.report-summary {
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.report-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-download {
+    flex: 1;
+    background: var(--primary);
+    color: var(--secondary);
+    padding: 8px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    transition: filter 0.2s;
+}
+
+.btn-view {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    text-align: center;
+    cursor: pointer;
+}
+
+/* Voice Controls */
+.voice-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-right: 15px;
+}
+
+.mic-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    transition: transform 0.2s;
+    color: #888;
+}
+
+.mic-btn.active {
+    color: #ef4444;
+    transform: scale(1.2);
+    animation: pulse 1.5s infinite;
+}
+
+.speaker-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: #888;
+}
+
+.speaker-toggle.active {
+    color: var(--primary);
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}

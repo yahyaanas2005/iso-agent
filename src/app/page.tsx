@@ -37,8 +37,46 @@ export default function Home() {
     }
   }, [messages]);
 
-  const addAssistantMessage = (content: string) => {
-    setMessages(prev => [...prev, { role: 'assistant', content }]);
+  const [speechEnabled, setSpeechEnabled] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && ('WebkitSpeechRecognition' in window || 'speechRecognition' in window)) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onerror = () => setIsListening(false);
+      recognitionRef.current.onend = () => setIsListening(false);
+    }
+  }, []);
+
+  const speak = (text: string) => {
+    if (!speechEnabled) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      setIsListening(true);
+      recognitionRef.current?.start();
+    }
+  };
+
+  const addAssistantMessage = (content: string, type: 'text' | 'report' = 'text', data?: any) => {
+    setMessages(prev => [...prev, { role: 'assistant', content, type, data } as any]);
+    speak(content);
   };
 
   const handleSend = async () => {
@@ -128,7 +166,11 @@ export default function Home() {
                 const today = new Date().toISOString();
                 const report = await reportingService.getBalanceSheet(today);
                 if (report.result) {
-                  addAssistantMessage(`Report ready: ${report.pdfLink || 'Check your dashboard.'}`);
+                  addAssistantMessage('Your Balance Sheet is ready!', 'report', {
+                    title: 'Balance Sheet',
+                    summary: 'Your statement has been generated as of today.',
+                    pdfLink: report.pdfLink
+                  });
                 } else {
                   addAssistantMessage(`Could not generate report: ${report.error || 'No data found.'}`);
                 }
@@ -232,6 +274,15 @@ export default function Home() {
             <h1>ISOLATERP <span>AI Accountant</span></h1>
           </div>
           <div className="actions">
+            <div className="voice-actions">
+              <button
+                className={`speaker-toggle ${speechEnabled ? 'active' : ''}`}
+                onClick={() => setSpeechEnabled(!speechEnabled)}
+                title={speechEnabled ? "Mute AI Voice" : "Enable AI Voice"}
+              >
+                {speechEnabled ? '🔊' : '🔈'}
+              </button>
+            </div>
             <button className="settings-btn" onClick={() => setShowSettings(!showSettings)}>
               ⚙️
             </button>
@@ -255,11 +306,31 @@ export default function Home() {
         )}
 
         <div className="messages" ref={scrollRef}>
-          {messages.map((msg, i) => (
+          {messages.map((msg: any, i) => (
             <div key={i} className={`message-wrapper ${msg.role}`}>
               <div className="avatar">{msg.role === 'assistant' ? 'IA' : 'U'}</div>
               <div className="message-content">
                 {msg.content}
+
+                {msg.type === 'report' && (
+                  <div className="report-card">
+                    <div className="report-header">
+                      <span className="report-icon">📊</span>
+                      <span className="report-title">{msg.data?.title || 'Financial Report'}</span>
+                    </div>
+                    <div className="report-summary">
+                      {msg.data?.summary || 'The requested financial statement has been generated successfully.'}
+                    </div>
+                    <div className="report-actions">
+                      <a href={msg.data?.pdfLink || '#'} target="_blank" className="btn-download">
+                        📥 Download PDF
+                      </a>
+                      <button className="btn-view" onClick={() => alert('Detailed view coming soon!')}>
+                        👁️ View HTML
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -282,9 +353,16 @@ export default function Home() {
             </div>
           )}
           <div className="input-area">
+            <button
+              className={`mic-btn ${isListening ? 'active' : ''}`}
+              onClick={toggleListening}
+              title="Speak to the Accountant"
+            >
+              🎤
+            </button>
             <input
               type="text"
-              placeholder="Type your command (e.g., 'Record a sale for $500')..."
+              placeholder="Type your command (e.g., 'Get balance sheet')..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
