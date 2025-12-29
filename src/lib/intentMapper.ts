@@ -9,13 +9,16 @@ export const mapIntent = (input: string): Intent => {
     const text = input.toLowerCase();
 
     if (text.includes('login') || text.includes('sign in') || text.includes('authenticate')) {
-        const email = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
-        // Look for password after keywords
-        const pwMatch = text.match(/(?:password|with|and|is)\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/);
+        // Extract from ORIGINAL input to preserve case
+        const email = input.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
+
+        // Look for password after keywords in the ORIGINAL input
+        // Keywords are case-insensitive, but capture is as-is
+        const pwMatch = input.match(/(?:password|with|and|is)\s+([a-zA-Z0-9!@#$%^&*()_+]{3,})/i);
         const password = pwMatch ? pwMatch[1] : null;
 
-        // Extract Tenant ID if provided (e.g. "tenant O1EG681Y4V")
-        const tenantMatch = text.match(/tenant\s+([a-zA-Z0-9]+)/i);
+        // Extract Tenant ID from ORIGINAL input (e.g. "tenant O1EG681Y4V")
+        const tenantMatch = input.match(/tenant\s+([a-zA-Z0-9]+)/i);
         const tenantId = tenantMatch ? tenantMatch[1] : null;
 
         return { type: 'LOGIN', params: { email, password, tenantId } };

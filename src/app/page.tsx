@@ -95,7 +95,7 @@ export default function Home() {
             const explicitTenantId = intent.params.tenantId;
 
             if (explicitTenantId) {
-              addAssistantMessage(`Using provided tenant: ${explicitTenantId}. Authenticating...`);
+              addAssistantMessage(`Using provided tenant context: ${explicitTenantId}. Authenticating...`);
               localStorage.setItem('tenantId', explicitTenantId);
 
               const authData = await authService.login({
@@ -109,23 +109,26 @@ export default function Home() {
                 setSession(prev => ({
                   ...prev,
                   token: authData.result.accessToken,
-                  step: 'AUTHENTICATED',
+                  step: 'READY',
                   data: { ...prev.data, email: intent.params.email, tenantId: explicitTenantId }
                 }));
-                addAssistantMessage(`Successfully authenticated with tenant ${explicitTenantId}! I'm ready to help.`);
+                addAssistantMessage(`Welcome! Successfully authenticated with tenant "${explicitTenantId}". I am now context-aware and ready for your accounting tasks.`);
 
                 // Handle multi-intent (e.g. login AND get report)
                 if (currentInput.toLowerCase().includes('balance sheet')) {
-                  addAssistantMessage('Fetching your Balance Sheet...');
+                  addAssistantMessage('Fetching your Balance Sheet as requested...');
                   const today = new Date().toISOString();
                   const report = await reportingService.getBalanceSheet(today);
                   if (report.result) {
-                    addAssistantMessage(`Balance Sheet ready: ${report.pdfLink || 'Process complete.'}`);
+                    addAssistantMessage(`Your Balance Sheet is ready: ${report.pdfLink || 'Generated successfully.'}`);
+                  } else {
+                    addAssistantMessage(`The report could not be generated: ${report.error || 'No data found for the selected period.'}`);
                   }
                 }
                 return;
               } else {
-                addAssistantMessage(`Login failed for tenant ${explicitTenantId}. Please check your password.`);
+                const errorMsg = authData.error || 'Check your credentials or tenant permissions.';
+                addAssistantMessage(`Authentication failed for tenant ${explicitTenantId}. Error: ${errorMsg}`);
                 return;
               }
             }
