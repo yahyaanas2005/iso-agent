@@ -81,12 +81,12 @@ export const mapIntent = (input: string): Intent => {
         };
     }
 
-    if (text.includes('sale') || text.includes('invoice') || text.includes('sold')) {
+    if ((text.includes('sale') || text.includes('invoice') || text.includes('sold')) && !text.includes('show') && !text.includes('list') && !text.includes('get')) {
         const amount = text.match(/\d+(\.\d+)?/)?.[0];
         return { type: 'RECORD_SALE', params: { amount } };
     }
 
-    if (text.includes('purchase') || text.includes('bill') || text.includes('bought')) {
+    if ((text.includes('purchase') || text.includes('bill') || text.includes('bought')) && !text.includes('show') && !text.includes('list') && !text.includes('get')) {
         const amount = text.match(/\d+(\.\d+)?/)?.[0];
         return { type: 'RECORD_PURCHASE', params: { amount } };
     }

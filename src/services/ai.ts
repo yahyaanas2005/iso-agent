@@ -43,6 +43,10 @@ export const aiService = {
          - Endpoint: /api/services/app/Account/GetLoginTenants
          - Method: POST
          - Body: { "email": "..." } (Only works if not logged in? Or for switching).
+
+      8. **List Invoices (Show Invoices/Sales)**:
+         - Endpoint: /api/services/app/InvoiceInfo/GetInvoiceInfoList
+         - Method: GET
          
       ## HANDLING LISTS & HTML
       - If the user asks for a LIST (e.g., "show customers"), ALWAYS use the \`EXECUTE_API\` action.
