@@ -20,7 +20,7 @@ export default function Home() {
   const [session, setSession] = useState<{
     token: string | null;
     tenantId: string | null;
-    step: 'GREETING' | 'AUTH_EMAIL' | 'AUTH_PASSWORD' | 'TENANT_SELECTION' | 'READY';
+    step: 'GREETING' | 'AUTH_EMAIL' | 'AUTH_PASSWORD' | 'TENANT_SELECTION' | 'READY' | 'AUTHENTICATED';
     data: any;
   }>({
     token: null,
