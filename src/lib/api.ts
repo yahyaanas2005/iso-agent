@@ -41,10 +41,11 @@ export const api = async (path: string, options: RequestInit = {}) => {
     if (contentType && contentType.includes('application/json')) {
       const data = await response.json();
       if (!response.ok) {
+        const detail = data.error?.details || '';
         return {
           success: false,
           result: data,
-          error: data.error?.message || data.message || JSON.stringify(data)
+          error: `${data.error?.message || data.message || 'Error'}${detail ? ': ' + detail : ''}`
         };
       }
       return data;

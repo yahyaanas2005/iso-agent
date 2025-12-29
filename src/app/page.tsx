@@ -106,6 +106,7 @@ export default function Home() {
             const authData = await authService.login({
               userNameOrEmailAddress: intent.params.email,
               password: intent.params.password,
+              tenancyName: explicitTenantId || undefined,
               rememberClient: true
             });
 
