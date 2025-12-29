@@ -40,8 +40,12 @@ export const api = async (path: string, options: RequestInit = {}) => {
       const text = await response.text();
       return { success: response.ok, result: text, error: response.ok ? null : `API Error: ${response.status}` };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('API Fetch Error:', error);
-    return { success: false, result: null, error: 'Network or connection error. Please verify the API endpoint is accessible.' };
+    return {
+      success: false,
+      result: null,
+      error: `Connectivity Error: ${error.message || 'Unknown network error'}. Likely CORS or blocked request.`
+    };
   }
 };
