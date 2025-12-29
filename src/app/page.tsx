@@ -329,7 +329,59 @@ export default function Home() {
             setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));
             addAssistantMessage('Please provide your email address to sign in.');
           }
-        } else if (intent.type === 'RECORD_SALE') {
+        }
+
+        // --- AI INTERCEPTION FOR ALL OPERATIONS ---
+        else if (apiKey && intent.type !== 'HELP' && intent.type !== 'UNKNOWN' && intent.type !== 'SWITCH_TENANT') {
+          // If we have an AI key, let the Brain handle EVERYTHING except Login/Switch/Help/Unknown
+          // This unlocks the full 2000+ API potential without hardcoded blocks intercepting
+          const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
+
+          // Check for JSON Action Protocol
+          if (aiMsg.includes('```json')) {
+            const jsonMatch = aiMsg.match(/```json\n([\s\S]*?)\n```/);
+            if (jsonMatch && jsonMatch[1]) {
+              try {
+                const actionBlock = JSON.parse(jsonMatch[1]);
+                if (actionBlock.action === 'EXECUTE_API') {
+                  addAssistantMessage('Processing your request in ERP...');
+                  const method = actionBlock.method || 'GET';
+                  const body = actionBlock.body ? JSON.stringify(actionBlock.body) : null;
+
+                  // Determine if it's a list/report request to format nicely
+                  let isReport = actionBlock.endpoint.includes('Report') || actionBlock.endpoint.includes('List');
+
+                  const apiRes = await api(actionBlock.endpoint, { method, body });
+
+                  if (apiRes.success) {
+                    // Smart Formatting for Lists
+                    if (Array.isArray(apiRes.result?.result) || Array.isArray(apiRes.result)) {
+                      const items = apiRes.result?.result || apiRes.result;
+                      const preview = items.slice(0, 10).map((i: any) => JSON.stringify(i)).join('\n');
+                      addAssistantMessage(actionBlock.successMessage || `Operation successful. Found ${items.length} items.\n\n${preview}`);
+                    } else {
+                      addAssistantMessage(actionBlock.successMessage || `Operation successful.\nResult: ${JSON.stringify(apiRes.result)}`);
+                    }
+                  } else {
+                    addAssistantMessage(`ERP Error: ${apiRes.error?.message || apiRes.error || 'Operation failed'}`);
+                  }
+                }
+              } catch (e) {
+                addAssistantMessage(aiMsg); // Fallback to raw text if JSON parse fails
+              }
+            } else {
+              addAssistantMessage(aiMsg);
+            }
+          } else {
+            addAssistantMessage(aiMsg);
+          }
+          // IMPORTANT: Return here to skip hardcoded legacy blocks
+          setLoading(false);
+          return;
+        }
+
+        // --- LEGACY HARDCODED FALLBACKS (Only used if no API Key or for specific UI flows) ---
+        else if (intent.type === 'RECORD_SALE') {
           if (!session.token) {
             addAssistantMessage('You need to be signed in to record a sale. Would you like to log in now?');
           } else {
@@ -495,42 +547,7 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
             }
           }
         } else {
-          if (apiKey) {
-            let aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
-
-            // Check for valid JSON block with action
-            const jsonMatch = aiMsg.match(/```json\n([\s\S]*?)\n```/) || aiMsg.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              try {
-                const rawJson = jsonMatch[1] || jsonMatch[0];
-                const actionData = JSON.parse(rawJson);
-
-                if (actionData.action === 'EXECUTE_API' && actionData.endpoint) {
-                  addAssistantMessage(`Executing action on ${actionData.endpoint}...`);
-                  const result = await api(actionData.endpoint, {
-                    method: actionData.method || 'POST',
-                    body: JSON.stringify(actionData.body || {})
-                  });
-
-                  if (result.success) {
-                    addAssistantMessage(actionData.successMessage || 'Action completed successfully.');
-                  } else {
-                    addAssistantMessage(`Action failed: ${result.error || 'Unknown error'}`);
-                  }
-                } else {
-                  // Just a regular message that happened to look like JSON or unhandled action
-                  addAssistantMessage(aiMsg.replace(/```json[\s\S]*```/, '').trim() || aiMsg);
-                }
-              } catch (e) {
-                // Failed to parse or execute, just show message
-                addAssistantMessage(aiMsg);
-              }
-            } else {
-              addAssistantMessage(aiMsg);
-            }
-          } else {
-            addAssistantMessage("I'm not sure how to handle that request yet. I can help with bookkeeping, reports, and tenant management.");
-          }
+          addAssistantMessage("I'm not sure how to handle that request yet. I can help with bookkeeping, reports, and tenant management.");
         }
       }
     } catch (error) {
