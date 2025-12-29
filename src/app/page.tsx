@@ -1,65 +1,246 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import './chat.css';
+import { authService } from '../services/auth';
+import { bookkeepingService } from '../services/bookkeeping';
+import { reportingService } from '../services/reporting';
+import { aiService } from '../services/ai';
+import { mapIntent, IntentType } from '../lib/intentMapper';
+import { historyManager } from '../lib/history';
 
 export default function Home() {
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Welcome back! I am your ISOLATERP Global AI Accountant. How can I assist you with your financial actions today?' }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [session, setSession] = useState<{
+    token: string | null;
+    tenantId: string | null;
+    step: 'GREETING' | 'AUTH_EMAIL' | 'AUTH_PASSWORD' | 'TENANT_SELECTION' | 'READY';
+    data: any;
+  }>({
+    token: null,
+    tenantId: null,
+    step: 'GREETING',
+    data: {}
+  });
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const addAssistantMessage = (content: string) => {
+    setMessages(prev => [...prev, { role: 'assistant', content }]);
+  };
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+
+    const userMessage = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
+    setInput('');
+    setLoading(true);
+
+    try {
+      if (session.step === 'AUTH_EMAIL') {
+        const tenants = await authService.getTenants(currentInput);
+        if (tenants.result && tenants.result.length > 0) {
+          setSession(prev => ({ ...prev, step: 'AUTH_PASSWORD', data: { ...prev.data, email: currentInput, tenants: tenants.result } }));
+          addAssistantMessage('Great. Now, please enter your password to continue.');
+        } else {
+          addAssistantMessage('I could not find any companies associated with that email. Please try again.');
+        }
+      } else if (session.step === 'AUTH_PASSWORD') {
+        const authData = await authService.login({
+          userNameOrEmailAddress: session.data.email,
+          password: currentInput,
+          rememberClient: true
+        });
+
+        if (authData.result && authData.result.accessToken) {
+          localStorage.setItem('token', authData.result.accessToken);
+          setSession(prev => ({ ...prev, token: authData.result.accessToken, step: 'TENANT_SELECTION' }));
+          const tenantList = session.data.tenants.map((t: any, i: number) => `${i + 1}. ${t.tenancyName}`).join('\n');
+          addAssistantMessage(`Authentication successful! Please select a company from the list below (type the name or number):\n\n${tenantList}`);
+        } else {
+          addAssistantMessage('Incorrect password. Please try again.');
+        }
+      } else if (session.step === 'TENANT_SELECTION') {
+        const selectedTenant = session.data.tenants.find((t: any, i: number) =>
+          t.tenancyName.toLowerCase() === currentInput.toLowerCase() || (i + 1).toString() === currentInput
+        );
+
+        if (selectedTenant) {
+          localStorage.setItem('tenantId', selectedTenant.tenantId);
+          setSession(prev => ({ ...prev, tenantId: selectedTenant.tenantId, step: 'READY' }));
+          addAssistantMessage(`Context set to "${selectedTenant.tenancyName}". I am ready for your commands! You can ask me to "Record a sale", "Show me a report", or "Manage banks".`);
+        } else {
+          addAssistantMessage('Invalid selection. Please choose from the available companies.');
+        }
+      } else {
+        const intent = mapIntent(currentInput);
+        historyManager.saveInteraction(currentInput, intent);
+
+        if (intent.type === 'LOGIN') {
+          setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));
+          addAssistantMessage('I am ready to help you sign in. Please provide your email address.');
+        } else if (intent.type === 'RECORD_SALE') {
+          if (!session.token) {
+            addAssistantMessage('You need to be signed in to record a sale. Would you like to log in now?');
+          } else {
+            if (apiKey) {
+              const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
+              addAssistantMessage(aiMsg);
+            } else {
+              addAssistantMessage(`Recording a sale for $${intent.params.amount || '...'}. Confirming details...`);
+            }
+            const result = await bookkeepingService.recordSale({
+              customerTitle: 'Walk-in Customer',
+              invoiceInfoDetails: [
+                { itemTitle: 'General Item', unitPrice: intent.params.amount || '0', quantity: '1' }
+              ]
+            });
+            if (result.success) {
+              if (!apiKey) addAssistantMessage(`Successfully recorded sale. Invoice No: ${result.result.invoiceNo}, Voucher: ${result.result.voucherNumber}. Would you like the PDF link?`);
+            } else {
+              addAssistantMessage(`Failed to record sale: ${result.error || 'Unknown error'}`);
+            }
+          }
+        } else if (intent.type === 'GET_REPORT') {
+          if (apiKey) {
+            const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
+            addAssistantMessage(aiMsg);
+          } else {
+            addAssistantMessage('Generating your financial report... One moment.');
+          }
+          const result = await reportingService.getVoucherReport({ BranchTitle: 'All' });
+          if (result.success) {
+            if (!apiKey) addAssistantMessage('Your report is ready! I found several vouchers for this period. Should I summarize them for you?');
+          } else {
+            addAssistantMessage(`Could not fetch report: ${result.error || 'Access denied'}`);
+          }
+        } else if (intent.type === 'RECORD_PURCHASE') {
+          if (!session.token) {
+            addAssistantMessage('You need to be signed in to record a purchase. Would you like to log in now?');
+          } else {
+            if (apiKey) {
+              const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
+              addAssistantMessage(aiMsg);
+            } else {
+              addAssistantMessage(`Recording a purchase for $${intent.params.amount || '...'}. Processing bill...`);
+            }
+            const result = await bookkeepingService.recordPurchase({
+              vendorTitle: 'General Supplier',
+              billingInfoDetails: [
+                { itemTitle: 'General Expense', unitPrice: intent.params.amount || '0', quantity: '1' }
+              ]
+            });
+            if (result.success) {
+              if (!apiKey) addAssistantMessage(`Successfully recorded purchase. Bill No: ${result.result.billNo}, Voucher: ${result.result.voucherNumber}.`);
+            } else {
+              addAssistantMessage(`Failed to record purchase: ${result.error || 'Unknown error'}`);
+            }
+          }
+        } else if (intent.type === 'SWITCH_TENANT') {
+          setSession(prev => ({ ...prev, step: 'TENANT_SELECTION' }));
+          addAssistantMessage('Which company would you like to switch to?');
+        } else {
+          if (apiKey) {
+            const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
+            addAssistantMessage(aiMsg);
+          } else {
+            addAssistantMessage("I'm not sure how to handle that request yet. I can help with bookkeeping, reports, and tenant management.");
+          }
+        }
+      }
+    } catch (error) {
+      addAssistantMessage('Sorry, I encountered an error. Please try again or check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <main className="container">
+      <div className="chat-window">
+        <header className="header">
+          <div className="logo">
+            <span className="logo-icon">▲</span>
+            <h1>ISOLATERP <span>AI Accountant</span></h1>
+          </div>
+          <div className="actions">
+            <button className="settings-btn" onClick={() => setShowSettings(!showSettings)}>
+              ⚙️
+            </button>
+            <div className="status">
+              <span className="status-dot"></span> Online
+            </div>
+          </div>
+        </header>
+
+        {showSettings && (
+          <div className="settings-panel">
+            <h3>AI Configuration</h3>
+            <input
+              type="password"
+              placeholder="Enter OpenAI API Key..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <p className="hint">Using GPT-4o-mini for professional accounting interactions.</p>
+          </div>
+        )}
+
+        <div className="messages" ref={scrollRef}>
+          {messages.map((msg, i) => (
+            <div key={i} className={`message-wrapper ${msg.role}`}>
+              <div className="avatar">{msg.role === 'assistant' ? 'IA' : 'U'}</div>
+              <div className="message-content">
+                {msg.content}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="message-wrapper assistant">
+              <div className="avatar">IA</div>
+              <div className="message-content typing">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          )}
         </div>
-      </main>
-    </div>
+
+        <div className="input-container">
+          {input && historyManager.getSuggestions(input).length > 0 && (
+            <div className="suggestions">
+              {historyManager.getSuggestions(input).map((s, i) => (
+                <button key={i} onClick={() => setInput(s)}>{s}</button>
+              ))}
+            </div>
+          )}
+          <div className="input-area">
+            <input
+              type="text"
+              placeholder="Type your command (e.g., 'Record a sale for $500')..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            />
+            <button onClick={handleSend} disabled={loading}>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
