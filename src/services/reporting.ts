@@ -35,17 +35,20 @@ export const reportingService = {
         });
     },
     getCustomers: async (title: string = '') => {
-        return api(`/api/services/app/Customer/GetCustomersTitleResponse?title=${title}`, {
+        const query = title ? `title=${encodeURIComponent(title)}` : 'title=%20';
+        return api(`/api/services/app/Customer/GetCustomersTitleResponse?${query}`, {
             method: 'GET'
         });
     },
     getVendors: async (title: string = '') => {
-        return api(`/api/services/app/Supplier/GetVendorsTitleResponse?title=${title}`, {
+        const query = title ? `title=${encodeURIComponent(title)}` : 'title=%20';
+        return api(`/api/services/app/Supplier/GetVendorsTitleResponse?${query}`, {
             method: 'GET'
         });
     },
     getItems: async (title: string = '') => {
-        return api(`/api/services/app/Item/GetItemsTitleResponse?title=${title}`, {
+        const query = title ? `title=${encodeURIComponent(title)}` : 'title=%20';
+        return api(`/api/services/app/Item/GetItemsTitleResponse?${query}`, {
             method: 'GET'
         });
     },

@@ -44,8 +44,22 @@ export const mapIntent = (input: string): Intent => {
         return { type: 'LIST_VENDORS', params: {} };
     }
 
-    if (text.includes('report') || text.includes('balance sheet') || text.includes('profit and loss') || text.includes('p&l')) {
-        return { type: 'GET_REPORT', params: {} };
+    // Enhanced Report Intent with Date Parsing
+    if (text.includes('report') || text.includes('balance sheet') || text.includes('profit') || text.includes('p&l') || text.includes('pnl')) {
+        let dateRange = { from: '', to: '' };
+        if (text.includes('last 6 months')) {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 6);
+            dateRange.from = d.toISOString();
+            dateRange.to = new Date().toISOString();
+        }
+        return {
+            type: 'GET_REPORT',
+            params: {
+                isPnl: text.includes('profit') || text.includes('p&l') || text.includes('pnl'),
+                dateRange
+            }
+        };
     }
 
     if (text.includes('sale') || text.includes('invoice') || text.includes('sold')) {
@@ -58,8 +72,9 @@ export const mapIntent = (input: string): Intent => {
         return { type: 'RECORD_PURCHASE', params: { amount } };
     }
 
-    if (text.includes('switch') || text.includes('change company') || text.includes('select tenant')) {
-        return { type: 'SWITCH_TENANT', params: {} };
+    if (text.includes('switch') || text.includes('change company') || text.includes('select tenant') || text.includes('pin')) {
+        const pinMatch = input.match(/pin:?\s*([a-zA-Z0-9]+)/i);
+        return { type: 'SWITCH_TENANT', params: { pin: pinMatch ? pinMatch[1] : null } };
     }
 
     return { type: 'UNKNOWN', params: {} };

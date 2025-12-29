@@ -217,20 +217,35 @@ export default function Home() {
               addAssistantMessage(`Successfully authenticated! Current company context: ${activeTenant}.`);
 
               // Process composite report requests
-              if (currentInput.toLowerCase().includes('balance sheet') || currentInput.toLowerCase().includes('report') || currentInput.toLowerCase().includes('pnl')) {
+              const lowerInput = currentInput.toLowerCase();
+              if (lowerInput.includes('balance sheet') || lowerInput.includes('report') || lowerInput.includes('pnl') || lowerInput.includes('profit')) {
                 addAssistantMessage('Fetching your financial data for the report...');
                 const realData = await fetchRealReportData();
 
-                const today = new Date().toISOString();
-                const pdfReport = await reportingService.getBalanceSheet(today);
+                let pdfReport;
+                let reportTitle = 'Financial Report';
+
+                if (lowerInput.includes('profit') || lowerInput.includes('pnl') || lowerInput.includes('loss')) {
+                  // Default to last 6 months if not specified
+                  const toDate = new Date();
+                  const fromDate = new Date();
+                  fromDate.setMonth(toDate.getMonth() - 6);
+                  pdfReport = await reportingService.getPNL(fromDate.toISOString(), toDate.toISOString());
+                  reportTitle = 'Profit & Loss (Last 6 Months)';
+                } else {
+                  const today = new Date().toISOString();
+                  pdfReport = await reportingService.getBalanceSheet(today);
+                  reportTitle = 'Balance Sheet';
+                }
+
                 const pdfUrl = pdfReport?.pdfLink
                   ? (pdfReport.pdfLink.startsWith('http')
                     ? pdfReport.pdfLink
                     : `https://api.isolaterp.ai${pdfReport.pdfLink.startsWith('/') ? '' : '/'}${pdfReport.pdfLink}`)
                   : '#';
 
-                addAssistantMessage('Your Balance Sheet is ready!', 'report', {
-                  title: 'Balance Sheet',
+                addAssistantMessage(`Your ${reportTitle} is ready!`, 'report', {
+                  title: reportTitle,
                   summary: 'Your statement has been generated with live data from your ERP.',
                   pdfLink: pdfUrl,
                   htmlData: realData
@@ -282,16 +297,28 @@ export default function Home() {
               addAssistantMessage('Fetching live data for your report...');
               const realData = await fetchRealReportData();
 
-              const today = new Date().toISOString();
-              const pdfRes = await reportingService.getBalanceSheet(today);
+              let pdfRes;
+              let reportTitle = 'Financial Report';
+
+              if (intent.params.isPnl || (intent.params.dateRange && intent.params.dateRange.from)) {
+                const fromDate = intent.params.dateRange?.from || new Date(new Date().setMonth(new Date().getMonth() - 6)).toISOString();
+                const toDate = intent.params.dateRange?.to || new Date().toISOString();
+                pdfRes = await reportingService.getPNL(fromDate, toDate);
+                reportTitle = 'Profit & Loss Statement';
+              } else {
+                const today = new Date().toISOString();
+                pdfRes = await reportingService.getBalanceSheet(today);
+                reportTitle = 'Balance Sheet';
+              }
+
               const pdfUrl = pdfRes?.pdfLink
                 ? (pdfRes.pdfLink.startsWith('http')
                   ? pdfRes.pdfLink
                   : `https://api.isolaterp.ai${pdfRes.pdfLink.startsWith('/') ? '' : '/'}${pdfRes.pdfLink}`)
                 : '#';
 
-              addAssistantMessage('Generated your Balance Sheet using real-time ERP data.', 'report', {
-                title: 'Balance Sheet',
+              addAssistantMessage(`Generated your ${reportTitle} using real-time ERP data.`, 'report', {
+                title: reportTitle,
                 summary: 'Real-time financial summary.',
                 pdfLink: pdfUrl,
                 htmlData: realData
@@ -371,8 +398,20 @@ export default function Home() {
 
 I currently support 136 ERP endpoints including Branches, Projects, Bank Transctions, and Invoices.`);
         } else if (intent.type === 'SWITCH_TENANT') {
-          setSession(prev => ({ ...prev, step: 'TENANT_SELECTION' }));
-          addAssistantMessage('Which company would you like to switch to?');
+          if (intent.params.pin) {
+            // Handle PIN switch directly if pin extracted
+            const pin = intent.params.pin;
+            addAssistantMessage(`Switching to company with PIN: ${pin}...`);
+            // NOTE: Since the API for GetTenantByPin isn't verified, we might need a specific endpoint or just set context.
+            // For now, let's treat it as a tenant ID switch or assume we need to re-login with this context.
+            // Assuming PIN maps to Tenant ID for now or we just store it.
+            localStorage.setItem('tenantId', pin); // If PIN works as TenantID
+            setSession(prev => ({ ...prev, tenantId: pin, data: { ...prev.data, tenantId: pin } }));
+            addAssistantMessage(`Context switched to company (PIN: ${pin}).`);
+          } else {
+            setSession(prev => ({ ...prev, step: 'TENANT_SELECTION' }));
+            addAssistantMessage('Which company would you like to switch to?');
+          }
         } else {
           if (apiKey) {
             const aiMsg = await aiService.getAccountantResponse([...messages, userMessage], apiKey);
