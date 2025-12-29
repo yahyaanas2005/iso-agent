@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import './chat.css';
@@ -413,7 +413,7 @@ export default function Home() {
           const res = await reportingService.getCustomers(intent.params.query);
           const customers = res.result?.result || res.result || [];
           if (customers && customers.length > 0) {
-            const list = customers.map((c: any) => `â€¢ ${c.customerTitle} (ID: ${c.id})`).join('\n');
+            const list = customers.map((c: any) => `• ${c.customerTitle} (ID: ${c.id})`).join('\n');
             addAssistantMessage(`I found ${customers.length} matching customers:\n\n${list}`);
           } else {
             addAssistantMessage(`No customers found matching "${intent.params.query}".`);
@@ -423,7 +423,7 @@ export default function Home() {
           const res = await reportingService.getCustomers();
           const customers = res.result?.result || res.result || [];
           if (Array.isArray(customers) && customers.length > 0) {
-            const list = customers.slice(0, 20).map((c: any) => `â€¢ ${c.customerTitle}`).join('\n');
+            const list = customers.slice(0, 20).map((c: any) => `• ${c.customerTitle}`).join('\n');
             addAssistantMessage(`Found ${customers.length} customers (showing top 20):\n\n${list}`);
           } else {
             addAssistantMessage('Could not retrieve customers or the list is empty.');
@@ -433,7 +433,7 @@ export default function Home() {
           const res = await reportingService.getItems();
           const items = res.result?.result || res.result || [];
           if (Array.isArray(items) && items.length > 0) {
-            const list = items.slice(0, 20).map((i: any) => `â€¢ ${i.itemTitle || i.inventoryItemTitle}`).join('\n');
+            const list = items.slice(0, 20).map((i: any) => `• ${i.itemTitle || i.inventoryItemTitle}`).join('\n');
             addAssistantMessage(`Found ${items.length} items in inventory (showing top 20):\n\n${list}`);
           } else {
             addAssistantMessage('Could not retrieve items or the list is empty.');
@@ -443,7 +443,7 @@ export default function Home() {
           const res = await reportingService.getVendors();
           const vendors = res.result?.result || res.result || [];
           if (Array.isArray(vendors) && vendors.length > 0) {
-            const list = vendors.slice(0, 20).map((v: any) => `â€¢ ${v.venderTitle || v.vendorTitle}`).join('\n');
+            const list = vendors.slice(0, 20).map((v: any) => `• ${v.venderTitle || v.vendorTitle}`).join('\n');
             addAssistantMessage(`Found ${vendors.length} vendors (showing top 20):\n\n${list}`);
           } else {
             addAssistantMessage('Could not retrieve vendors or the list is empty.');
@@ -455,8 +455,8 @@ export default function Home() {
 1. **Authentication**: Mention your email, password, and tenant ID to login (e.g., "login with user@mail.com password 123 tenant XYZ").
 2. **Reports**: Ask for "balance sheet" or "profit and loss" to see live data.
 3. **Voice Control**: 
-   - Click the ðŸŽ¤ icon to speak.
-   - Click the ðŸ”Š/ðŸ”ˆ icon to toggle AI voice output.
+   - Click the 🎤 icon to speak.
+   - Click the 🔊/🔈 icon to toggle AI voice output.
    - **Mic Permissions**: If the mic doesn't work, click the lock icon in your browser address bar and set 'Microphone' to 'Allow'.
 4. **Data Entry**: Mention sales or purchases (e.g., "record a sale of 500").
 5. **Context**: Use "switch company" to change your tenant context.
@@ -538,7 +538,7 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
       <div className="chat-window">
         <header className="header">
           <div className="logo">
-            <span className="logo-icon">â–²</span>
+            <span className="logo-icon">▲</span>
             <h1>ISOLATERP <span>AI Accountant</span></h1>
           </div>
           <div className="actions">
@@ -548,11 +548,11 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                 onClick={() => setSpeechEnabled(!speechEnabled)}
                 title={speechEnabled ? "Mute AI Voice" : "Enable AI Voice"}
               >
-                {speechEnabled ? 'ðŸ”Š' : 'ðŸ”ˆ'}
+                {speechEnabled ? '🔊' : '🔈'}
               </button>
             </div>
             <button className="settings-btn" onClick={() => setShowSettings(!showSettings)}>
-              âš™ï¸
+              ⚙️
             </button>
             <div className="status">
               <span className="status-dot"></span> Online
@@ -583,18 +583,18 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                 {msg.type === 'report' && (
                   <div className="report-card">
                     <div className="report-header">
-                      <span className="report-icon">ðŸ“Š</span>
+                      <span className="report-icon">📊</span>
                       <span className="report-title">{msg.data?.title || 'Financial Report'}</span>
                     </div>
                     <div className="report-meta" style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
-                      Source: Live ERP â€¢ Tenant: {session.tenantId || 'Default'}
+                      Source: Live ERP • Tenant: {session.tenantId || 'Default'}
                     </div>
                     <div className="report-summary">
                       {msg.data?.summary || 'The requested financial statement has been generated successfully.'}
                     </div>
                     <div className="report-actions">
                       <a href={msg.data?.pdfLink} target="_blank" rel="noopener noreferrer" className="action-btn pdf">
-                        ðŸ“¥ Download PDF
+                        📥 Download PDF
                       </a>
                       {msg.data?.htmlData && (
                         <button
@@ -604,40 +604,13 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
                             data: msg.data.htmlData
                           })}
                         >
-                          ðŸ‘ï¸ View HTML
+                          👁️ View HTML
                         </button>
                       )}
                     </div>
                   </div>
                 )}
 
-                {showReportModal && (
-                  <div className="report-modal-overlay" onClick={() => setShowReportModal(null)}>
-                    <div className="report-modal" onClick={e => e.stopPropagation()}>
-                      <div className="modal-header">
-                        <h2>{showReportModal.title}</h2>
-                        <button className="close-btn" onClick={() => setShowReportModal(null)}>Ã—</button>
-                      </div>
-                      <div className="modal-body">
-                        <table className="report-table">
-                          <thead>
-                            <tr>
-                              <th>Category / Account</th>
-                              <th className="amount-col">Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                                    <td className="amount-col">${item.amount}</td>
-                                  </tr>
-                                ))}
-                              </React.Fragment>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ))}
@@ -647,7 +620,7 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
               <div className="report-modal" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                   <h2>{showReportModal.title}</h2>
-                  <button className="close-btn" onClick={() => setShowReportModal(null)}>Ã—</button>
+                  <button className="close-btn" onClick={() => setShowReportModal(null)}>×</button>
                 </div>
                 <div className="modal-body">
                   {showReportModal.data ? (
@@ -687,7 +660,7 @@ I currently support 136 ERP endpoints including Branches, Projects, Bank Transct
             onClick={toggleListening}
             title={isListening ? "Stop Listening" : "Start Listening"}
           >
-            {isListening ? 'ðŸ›‘' : 'ðŸŽ¤'}
+            {isListening ? '🛑' : '🎤'}
           </button>
           <input
             type="text"
