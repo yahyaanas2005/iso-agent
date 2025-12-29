@@ -34,6 +34,21 @@ export const reportingService = {
             method: 'GET'
         });
     },
+    getCustomers: async (title: string = '') => {
+        return api(`/api/services/app/Customer/GetCustomersTitleResponse?title=${title}`, {
+            method: 'GET'
+        });
+    },
+    getVendors: async (title: string = '') => {
+        return api(`/api/services/app/Supplier/GetVendorsTitleResponse?title=${title}`, {
+            method: 'GET'
+        });
+    },
+    getItems: async (title: string = '') => {
+        return api(`/api/services/app/Item/GetItemsTitleResponse?title=${title}`, {
+            method: 'GET'
+        });
+    },
     getBankInfo: async () => {
         return api('/api/services/app/Bank/GetBankInfoList', {
             method: 'GET',

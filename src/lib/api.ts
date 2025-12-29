@@ -23,7 +23,9 @@ export const api = async (path: string, options: RequestInit = {}) => {
   if (tenantId) {
     headers.set('Abp-TenantId', tenantId);
   }
-  headers.set('Content-Type', 'application/json');
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   try {
     const response = await fetch(`${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`, {

@@ -92,16 +92,18 @@ export default function Home() {
         reportingService.getBanks()
       ]);
 
-      const totalSales = (invoices.result?.result || []).reduce((sum: number, inv: any) => sum + (inv.netValue || 0), 0);
-      const totalPurchases = (bills.result?.result || []).reduce((sum: number, bill: any) => sum + (bill.netValue || 0), 0);
-      const bankList = banks.result || [];
+      const totalSales = (invoices?.result?.result || []).reduce((sum: number, inv: any) => sum + (inv.netValue || 0), 0);
+      const totalPurchases = (bills?.result?.result || []).reduce((sum: number, bill: any) => sum + (bill.netValue || 0), 0);
+      const bankList = banks?.result?.result || banks?.result || [];
       const totalBank = bankList.reduce((sum: number, b: any) => sum + (b.balance || 0), 0);
+
+      const netEarnings = totalSales - totalPurchases;
 
       return [
         {
           category: 'Assets',
           items: [
-            { name: 'Cash and Bank', amount: totalBank.toLocaleString() },
+            { name: 'Cash and Bank Balance', amount: totalBank.toLocaleString() },
             { name: 'Accounts Receivable (Sales)', amount: totalSales.toLocaleString() }
           ],
           total: (totalBank + totalSales).toLocaleString()
@@ -116,9 +118,9 @@ export default function Home() {
         {
           category: 'Equity',
           items: [
-            { name: 'Current Period Earnings', amount: (totalSales - totalPurchases).toLocaleString() }
+            { name: 'Current Period Retained Earnings', amount: netEarnings.toLocaleString() }
           ],
-          total: (totalSales - totalPurchases).toLocaleString()
+          total: netEarnings.toLocaleString()
         }
       ];
     } catch (error) {
@@ -181,13 +183,13 @@ export default function Home() {
         if (intent.type === 'LOGIN') {
           if (intent.params.email && intent.params.password) {
             const explicitTenantId = intent.params.tenantId;
+            const activeTenant = explicitTenantId || 'Host/Default';
 
             if (explicitTenantId) {
               addAssistantMessage(`Logging you into tenant: ${explicitTenantId}...`);
               localStorage.setItem('tenantId', explicitTenantId);
             } else {
               addAssistantMessage(`No tenant provided. Attempting login to default/host account...`);
-              // Clear tenantId to ensure we hit the host/default context in Abp
               localStorage.removeItem('tenantId');
             }
 
@@ -198,9 +200,12 @@ export default function Home() {
               rememberClient: true
             });
 
-            if (authData.result?.accessToken) {
+            if (authData.result && authData.result.accessToken) {
               localStorage.setItem('token', authData.result.accessToken);
-              const activeTenant = explicitTenantId || 'Host/Default';
+              if (explicitTenantId) {
+                localStorage.setItem('tenantId', explicitTenantId);
+              }
+
               setSession(prev => ({
                 ...prev,
                 token: authData.result.accessToken,
@@ -208,6 +213,7 @@ export default function Home() {
                 tenantId: explicitTenantId || null,
                 data: { ...prev.data, email: intent.params.email, tenantId: activeTenant }
               }));
+
               addAssistantMessage(`Successfully authenticated! Current company context: ${activeTenant}.`);
 
               // Process composite report requests
@@ -310,6 +316,47 @@ export default function Home() {
               addAssistantMessage(`Failed to record purchase: ${result.error || 'Unknown error'}`);
             }
           }
+        } else if (intent.type === 'LIST_CUSTOMERS') {
+          addAssistantMessage('Retrieving customer list...');
+          const res = await reportingService.getCustomers();
+          if (res.result) {
+            const list = res.result.map((c: any) => `• ${c.customerTitle}`).join('\n');
+            addAssistantMessage(`Found ${res.result.length} customers:\n\n${list}`);
+          } else {
+            addAssistantMessage('Could not retrieve customers.');
+          }
+        } else if (intent.type === 'LIST_ITEMS') {
+          addAssistantMessage('Retrieving inventory items...');
+          const res = await reportingService.getItems();
+          if (res.result) {
+            const list = res.result.map((i: any) => `• ${i.inventoryItemTitle}`).join('\n');
+            addAssistantMessage(`Found ${res.result.length} items in inventory:\n\n${list}`);
+          } else {
+            addAssistantMessage('Could not retrieve items.');
+          }
+        } else if (intent.type === 'LIST_VENDORS') {
+          addAssistantMessage('Retrieving vendor list...');
+          const res = await reportingService.getVendors();
+          if (res.result) {
+            const list = res.result.map((v: any) => `• ${v.venderTitle}`).join('\n');
+            addAssistantMessage(`Found ${res.result.length} vendors:\n\n${list}`);
+          } else {
+            addAssistantMessage('Could not retrieve vendors.');
+          }
+        } else if (intent.type === 'HELP') {
+          addAssistantMessage(`
+**How to use ISOLATERP AI Accountant:**
+
+1. **Authentication**: Mention your email, password, and tenant ID to login (e.g., "login with user@mail.com password 123 tenant XYZ").
+2. **Reports**: Ask for "balance sheet" or "profit and loss" to see live data.
+3. **Voice Control**: 
+   - Click the 🎤 icon to speak.
+   - Click the 🔊/🔈 icon to toggle AI voice output.
+   - **Mic Permissions**: If the mic doesn't work, click the lock icon in your browser address bar and set 'Microphone' to 'Allow'.
+4. **Data Entry**: Mention sales or purchases (e.g., "record a sale of 500").
+5. **Context**: Use "switch company" to change your tenant context.
+
+I currently support 136 ERP endpoints including Branches, Projects, Bank Transctions, and Invoices.`);
         } else if (intent.type === 'SWITCH_TENANT') {
           setSession(prev => ({ ...prev, step: 'TENANT_SELECTION' }));
           addAssistantMessage('Which company would you like to switch to?');
