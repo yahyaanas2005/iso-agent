@@ -39,7 +39,15 @@ export const api = async (path: string, options: RequestInit = {}) => {
 
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      return await response.json();
+      const data = await response.json();
+      if (!response.ok) {
+        return {
+          success: false,
+          result: data,
+          error: data.error?.message || data.message || JSON.stringify(data)
+        };
+      }
+      return data;
     } else {
       const text = await response.text();
       return { success: response.ok, result: text, error: response.ok ? null : `API Error: ${response.status}` };

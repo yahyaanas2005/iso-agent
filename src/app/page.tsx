@@ -95,75 +95,52 @@ export default function Home() {
             const explicitTenantId = intent.params.tenantId;
 
             if (explicitTenantId) {
-              addAssistantMessage(`Using provided tenant context: ${explicitTenantId}. Authenticating...`);
+              addAssistantMessage(`Logging you into tenant: ${explicitTenantId}...`);
               localStorage.setItem('tenantId', explicitTenantId);
-
-              const authData = await authService.login({
-                userNameOrEmailAddress: intent.params.email,
-                password: intent.params.password,
-                rememberClient: true
-              });
-
-              if (authData.result?.accessToken) {
-                localStorage.setItem('token', authData.result.accessToken);
-                setSession(prev => ({
-                  ...prev,
-                  token: authData.result.accessToken,
-                  step: 'READY',
-                  data: { ...prev.data, email: intent.params.email, tenantId: explicitTenantId }
-                }));
-                addAssistantMessage(`Welcome! Successfully authenticated with tenant "${explicitTenantId}". I am now context-aware and ready for your accounting tasks.`);
-
-                // Handle multi-intent (e.g. login AND get report)
-                if (currentInput.toLowerCase().includes('balance sheet')) {
-                  addAssistantMessage('Fetching your Balance Sheet as requested...');
-                  const today = new Date().toISOString();
-                  const report = await reportingService.getBalanceSheet(today);
-                  if (report.result) {
-                    addAssistantMessage(`Your Balance Sheet is ready: ${report.pdfLink || 'Generated successfully.'}`);
-                  } else {
-                    addAssistantMessage(`The report could not be generated: ${report.error || 'No data found for the selected period.'}`);
-                  }
-                }
-                return;
-              } else {
-                const errorMsg = authData.error || 'Check your credentials or tenant permissions.';
-                addAssistantMessage(`Authentication failed for tenant ${explicitTenantId}. Error: ${errorMsg}`);
-                return;
-              }
+            } else {
+              addAssistantMessage(`No tenant provided. Attempting login to default/host account...`);
+              // Clear tenantId to ensure we hit the host/default context in Abp
+              localStorage.removeItem('tenantId');
             }
 
-            addAssistantMessage(`Searching for companies linked to ${intent.params.email}...`);
-            const tenants = await authService.getTenants(intent.params.email);
+            const authData = await authService.login({
+              userNameOrEmailAddress: intent.params.email,
+              password: intent.params.password,
+              rememberClient: true
+            });
 
-            if (tenants.result && Array.isArray(tenants.result) && tenants.result.length > 0) {
-              addAssistantMessage(`Found ${tenants.result.length} companies. Authenticating...`);
-              const authData = await authService.login({
-                userNameOrEmailAddress: intent.params.email,
-                password: intent.params.password,
-                rememberClient: true
-              });
+            if (authData.result?.accessToken) {
+              localStorage.setItem('token', authData.result.accessToken);
+              const activeTenant = explicitTenantId || 'Host/Default';
+              setSession(prev => ({
+                ...prev,
+                token: authData.result.accessToken,
+                step: 'READY',
+                tenantId: explicitTenantId || null,
+                data: { ...prev.data, email: intent.params.email, tenantId: activeTenant }
+              }));
+              addAssistantMessage(`Successfully authenticated! Current company context: ${activeTenant}.`);
 
-              if (authData.result?.accessToken) {
-                localStorage.setItem('token', authData.result.accessToken);
-                const tenantList = tenants.result.map((t: any, i: number) => `${i + 1}. ${t.tenancyName} (ID: ${t.tenantId})`).join('\n');
-                setSession(prev => ({
-                  ...prev,
-                  token: authData.result.accessToken,
-                  step: 'TENANT_SELECTION',
-                  data: { ...prev.data, email: intent.params.email, tenants: tenants.result }
-                }));
-                addAssistantMessage(`Authentication successful! Please select a company from the list (type name or number):\n\n${tenantList}`);
-              } else {
-                addAssistantMessage(`Found your account, but the password was incorrect for ${intent.params.email}.`);
-                setSession(prev => ({ ...prev, step: 'AUTH_PASSWORD', data: { ...prev.data, email: intent.params.email, tenants: tenants.result } }));
+              // Process composite report requests
+              if (currentInput.toLowerCase().includes('balance sheet')) {
+                addAssistantMessage('Fetching your Balance Sheet...');
+                const today = new Date().toISOString();
+                const report = await reportingService.getBalanceSheet(today);
+                if (report.result) {
+                  addAssistantMessage(`Report ready: ${report.pdfLink || 'Check your dashboard.'}`);
+                } else {
+                  addAssistantMessage(`Could not generate report: ${report.error || 'No data found.'}`);
+                }
               }
+              return;
             } else {
-              addAssistantMessage(`I could not find any companies for "${intent.params.email}". If you have a Tenant ID, please provide it (e.g., "login with ... tenant [ID]")`);
+              const diagError = authData.error || 'Invalid credentials.';
+              addAssistantMessage(`Authentication failed for ${explicitTenantId || 'Default Tenant'}. Error: ${diagError}`);
+              return;
             }
           } else {
             setSession(prev => ({ ...prev, step: 'AUTH_EMAIL' }));
-            addAssistantMessage('I am ready to help you sign in. Please provide your email address.');
+            addAssistantMessage('Please provide your email address to sign in.');
           }
         } else if (intent.type === 'RECORD_SALE') {
           if (!session.token) {
